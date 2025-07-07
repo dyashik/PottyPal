@@ -1,7 +1,23 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { View, Text, Button, Linking, Platform } from 'react-native';
+import Location from 'expo-location';
+import { useRouter } from 'expo-router';
+
 
 const LocationDeniedScreen = () => {
+
+    const router = useRouter();
+
+    useEffect(() => {
+        const checkPermission = async () => {
+            const { status } = await Location.requestForegroundPermissionsAsync();
+            if (status === 'granted') {
+                router.replace('/');
+            }
+        };
+        checkPermission();
+    }, [router]);
+
     const openSettings = () => {
         if (Platform.OS === 'ios') {
             Linking.openURL('app-settings:');

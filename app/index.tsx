@@ -115,6 +115,75 @@ export default function App() {
         },
     ];
 
+    useEffect(() => {
+        let sub: Location.LocationSubscription;
+
+        const startWatchingLocation = async () => {
+            sub = await Location.watchPositionAsync(
+                {
+                    accuracy: Location.Accuracy.Highest,
+                    distanceInterval: 20, // in meters
+                    timeInterval: 5000,   // optional: every 5 sec
+                },
+                (loc) => {
+                    maybeUpdateDistances(loc.coords);
+                }
+            );
+        };
+
+        startWatchingLocation();
+
+        return () => {
+            sub?.remove();
+        };
+    }, [places]);
+
+    const lastKnownUserCoordsRef = useRef<Location.LocationObjectCoords | null>(null);
+
+    const maybeUpdateDistances = async (newCoords: Location.LocationObjectCoords) => {
+        if (!lastKnownUserCoordsRef.current) {
+            lastKnownUserCoordsRef.current = newCoords;
+            return;
+        }
+
+        const { latitude: prevLat, longitude: prevLng } = lastKnownUserCoordsRef.current;
+        const { latitude, longitude } = newCoords;
+
+        const R = 6371000; // Earth radius in meters
+        const dLat = (latitude - prevLat) * Math.PI / 180;
+        const dLng = (longitude - prevLng) * Math.PI / 180;
+        const a = Math.sin(dLat / 2) ** 2 + Math.cos(prevLat * Math.PI / 180) * Math.cos(latitude * Math.PI / 180) * Math.sin(dLng / 2) ** 2;
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        const distanceMoved = R * c;
+
+        if (distanceMoved > 160) { // Only if user moves more than 50 meters
+            lastKnownUserCoordsRef.current = newCoords;
+
+            const updated = await Promise.all(
+                places.map(async place => {
+                    try {
+                        const distanceInfo = await fetchWalkingTimeAndDistance(place);
+                        return { ...place, distanceInfo };
+                    } catch (err) {
+                        console.log('Refetch distance failed for:', place.displayName?.text);
+                        return place;
+                    }
+                })
+            );
+
+            setPlaces(updated.filter(
+                (p): p is Place =>
+                    typeof p === 'object' &&
+                    p !== null &&
+                    'distanceInfo' in p &&
+                    typeof p.distanceInfo === 'object' &&
+                    'walking' in p.distanceInfo &&
+                    'driving' in p.distanceInfo
+            ));
+        }
+    };
+
+
 
     function mapToFilterCategory(type: string | undefined): 'restaurant' | 'cafe' | 'grocery_store' | null {
         if (!type) return null;
@@ -828,7 +897,7 @@ export default function App() {
                             key="search-area"
                             style={[
                                 styles.searchThisAreaContainer,
-                                { top: insets.top + 83, position: 'absolute' }
+                                { top: insets.top + 80, position: 'absolute' }
                             ]}
                         >
                             <TouchableOpacity
@@ -1329,7 +1398,6 @@ const styles = StyleSheet.create({
         position: 'absolute',
         top: 140, // below your branding and filters
         alignSelf: 'center',
-        zIndex: 9999,
         backgroundColor: 'transparent',
     },
 
