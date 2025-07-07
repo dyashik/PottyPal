@@ -520,7 +520,6 @@ export default function App() {
     };
 
 
-
     const fetchWalkingTimeAndDistance = async (place: Place) => {
         const apiKey = getGoogleMapsKey(true);
         if (!apiKey) throw new Error("Google API key is missing");
