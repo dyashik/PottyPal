@@ -14,14 +14,26 @@
       "backgroundColor": "#ffffff"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.pottypal.PottyPal",
+      "buildNumber": "1",
+      "config": {
+        "googleMapsApiKey": "AIzaSyA924VxnZfLnvUcqN2R9kzFqNjCRTeaIAI"
+      },
+      "appleTeamId": "LANP267Q8M"
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "edgeToEdgeEnabled": true
+      "edgeToEdgeEnabled": true,
+      "package": "com.pottypal.PottyPal",
+      "config": {
+        "googleMaps": {
+          "apiKey": "AIzaSyCfdFzoFg28aEjoCPOcrI61FsQJZSS-VLQ"
+        }
+      }
     },
     "web": {
       "bundler": "metro",
@@ -29,10 +41,20 @@
       "favicon": "./assets/images/favicon.png"
     },
     "plugins": [
-      "expo-router"
+      "expo-router",
+      "expo-font"
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "googleMapsApiKeyIOS": "AIzaSyA924VxnZfLnvUcqN2R9kzFqNjCRTeaIAI",
+      "googleMapsApiKeyAndroid": "AIzaSyCfdFzoFg28aEjoCPOcrI61FsQJZSS-VLQ",
+      "googleMapsApiKeyWeb": "AIzaSyBYbp_uVFyXPIUIYYZWi9c3eNqYh8myitg",
+      "router": {},
+      "eas": {
+        "projectId": "e66c1939-9234-4a73-869b-3985c59e312c"
+      }
     }
   }
 }
