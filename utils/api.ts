@@ -53,11 +53,11 @@ export interface FetchNearbyPlacesResponse {
 }
 
 export const DUMMY_PLACE: Place = {
-  displayName: { text: '' },
-  formattedAddress: '',
-  location: { latitude: 0, longitude: 0 },
-  primaryType: '',
-  googleMapsUri: 'dummy',
-  restroom: false,
-  // Add any other required Place fields with dummy values
+    displayName: { text: '' },
+    formattedAddress: '',
+    location: { latitude: 0, longitude: 0 },
+    primaryType: '',
+    googleMapsUri: 'dummy',
+    restroom: false,
+    // Add any other required Place fields with dummy values
 };

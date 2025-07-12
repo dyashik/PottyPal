@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { View, Text, Image, StyleSheet, ScrollView, TouchableOpacity, Linking, FlatList, Switch, Share, Pressable, Modal, Dimensions } from 'react-native';
 import { useLocalSearchParams, useNavigationContainerRef, useRouter } from 'expo-router';
 import { usePlaceStore } from '@/utils/usePlaceStore';
@@ -11,6 +11,7 @@ import { get } from 'react-native/Libraries/TurboModule/TurboModuleRegistry';
 import MapView, { Callout, Marker, Polyline } from 'react-native-maps';
 import getGoogleMapsApiKey from '@/config/getGoogleMapsKey';
 import { StackActions } from '@react-navigation/native';
+import CustomCallout from '@/components/CustomCallout';
 
 function formatType(type?: string) {
     if (!type) return '';
@@ -32,6 +33,7 @@ export default function PlaceDetails() {
     const [infoVisible, setInfoVisible] = useState(false);
     const navRef = useNavigationContainerRef();
     const { width } = Dimensions.get('window');
+    const markerRef = useRef<any>(null); // 👈 Add Marker ref
 
     const pottyPalMapStyle = [
         {
@@ -103,7 +105,13 @@ export default function PlaceDetails() {
         return Math.round(scale * size);
     }
 
-
+    useEffect(() => {
+        if (markerRef.current) {
+            setTimeout(() => {
+                markerRef.current?.showCallout(); // 👈 Show Callout after map renders
+            }, 500); // Delay slightly to ensure map and marker are ready
+        }
+    }, []);
     useEffect(() => {
         (async () => {
             let { status } = await Location.requestForegroundPermissionsAsync();
@@ -338,9 +346,10 @@ export default function PlaceDetails() {
                     )}
                 </View>
 
-                {/* Hours / Ratings / Distance */}
                 <View style={styles.metaRow}>
-                    <Text style={styles.meta}>🕒 {place.currentOpeningHours?.openNow ? 'Open Now' : 'Closed'}</Text>
+                    <Text style={styles.meta}>
+                        🕒 {place.currentOpeningHours?.openNow ? 'Open Now' : 'Closed'}
+                    </Text>
                     <Text style={styles.meta}>⭐️ {place.rating ?? 0} / 5</Text>
                     <Text style={styles.meta}>📍 {place.distanceInfo?.walking?.distance ?? 'N/A'}</Text>
                 </View>
@@ -362,13 +371,8 @@ export default function PlaceDetails() {
                             customMapStyle={pottyPalMapStyle}
                             provider='google'
                         >
-                            <Marker coordinate={place.location}>
-                                <Callout>
-                                    <View style={{ maxWidth: 200 }}>
-                                        <Text style={{ fontWeight: 'bold', fontSize: 16 }}>{place.displayName?.text}</Text>
-                                        <Text style={{ color: '#555' }}>{formatType(place.primaryType)}</Text>
-                                    </View>
-                                </Callout>
+                            <Marker ref={markerRef} coordinate={place.location} calloutAnchor={{ x: 0.5, y: -0.2 }}>
+                                <CustomCallout place={place} />
                             </Marker>
 
 
@@ -401,8 +405,9 @@ export default function PlaceDetails() {
                 {/* About */}
                 <View style={styles.aboutCard}>
                     <Text style={styles.aboutTitle}>{place.displayName?.text} Hours</Text>
-                    {place.currentOpeningHours?.weekdayDescriptions
-                        ? place.currentOpeningHours.weekdayDescriptions.map((desc, idx) => {
+                    {place.currentOpeningHours?.weekdayDescriptions ? (
+                        // For other places, show regular hours
+                        place.currentOpeningHours.weekdayDescriptions.map((desc, idx) => {
                             // Split at first colon to separate day and hours
                             const [day, ...rest] = desc.split(':');
                             const hours = rest.join(':').trim();
@@ -412,7 +417,9 @@ export default function PlaceDetails() {
                                 </Text>
                             );
                         })
-                        : <Text style={styles.aboutText}>No opening hours available.</Text>}
+                    ) : (
+                        <Text style={styles.aboutText}>No opening hours available.</Text>
+                    )}
                 </View>
 
 

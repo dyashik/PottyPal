@@ -9,6 +9,8 @@ import BottomSheet, { BottomSheetFlatList } from '@gorhom/bottom-sheet';
 const polyline = require('@mapbox/polyline');
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Place } from '@/utils/api';
+import BrandingContainer from '@/components/BrandingContainer';
+import CustomCallout from '@/components/CustomCallout';
 
 type LatLng = { latitude: number; longitude: number };
 
@@ -16,6 +18,7 @@ export default function FullscreenMap() {
     const { lat, lng, name, type, walkingURL } = useLocalSearchParams();
     const router = useRouter();
     const mapRef = useRef<MapView>(null);
+    const markerRef = useRef<any>(null); 
 
     const latNum = parseFloat(lat as string);
     const lngNum = parseFloat(lng as string);
@@ -107,7 +110,6 @@ export default function FullscreenMap() {
         try {
             const API_KEY = getGoogleMapsKey(true);
             const url = `https://maps.googleapis.com/maps/api/directions/json?origin=${origin.latitude},${origin.longitude}&destination=${destination.latitude},${destination.longitude}&mode=walking&key=${API_KEY}`;
-
             const response = await fetch(url);
             const data = await response.json();
 
@@ -155,6 +157,14 @@ export default function FullscreenMap() {
         }
     }
 
+    useEffect(() => {
+        if (markerRef.current) {
+            setTimeout(() => {
+                markerRef.current?.showCallout(); // 👈 Show Callout after map renders
+            }, 500); // Delay slightly to ensure map and marker are ready
+        }
+    }, []);
+
 
     // Helper to strip HTML from instructions
     const stripHtml = (html: string) => html.replace(/<[^>]+>/g, '');
@@ -170,9 +180,11 @@ export default function FullscreenMap() {
 
 
             {/* GPS Button */}
-            <View style={[styles.brandingContainer, { top: insets.top + 20, position: 'absolute' }]}>
-                <Text style={styles.brandingText}>PottyPal 🧻</Text>
+            <View style={{ top: 8, zIndex: 999 }}>
+                <BrandingContainer />
             </View>
+
+            {/* Branding Container */}
             {/* Map */}
             <MapView
                 style={{ flex: 1 }}
@@ -188,7 +200,9 @@ export default function FullscreenMap() {
                 provider="google"
             >
                 {/* Destination Marker */}
-                <Marker coordinate={{ latitude: latNum, longitude: lngNum }} title={name as string} description={type as string} />
+                <Marker ref={markerRef} coordinate={{ latitude: latNum, longitude: lngNum }} title={name as string} description={type as string} calloutAnchor={{ x: 0.5, y: -0.2 }}>
+                    <CustomCallout place={{ displayName: { text: name as string }, primaryType: type as string, location: { latitude: latNum, longitude: lngNum } }} />
+                </Marker>
 
                 {/* Route Polyline with dashed line */}
                 <Polyline
@@ -200,7 +214,6 @@ export default function FullscreenMap() {
                 />
             </MapView>
 
-            {/* Expandable Directions Panel */}
             {/* Bottom Sheet */}
             <BottomSheet
                 ref={bottomSheetRef}

@@ -16,7 +16,7 @@ import { useRouter } from 'expo-router';
 import * as Location from 'expo-location';
 import { DUMMY_PLACE, FetchNearbyPlacesResponse, Place } from '@/utils/api';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
-import { FontAwesome5 } from '@expo/vector-icons';
+import { FontAwesome5, FontAwesome6 } from '@expo/vector-icons';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import BottomSheet, { BottomSheetFlatList } from '@gorhom/bottom-sheet';
 import { usePlaceStore } from '@/utils/usePlaceStore';
@@ -25,7 +25,9 @@ import SortDropdown from '@/components/SortDropDown';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import getGoogleMapsKey from '@/config/getGoogleMapsKey';
 import { Portal, PortalProvider } from '@gorhom/portal';
-
+import { Image } from 'expo-image';
+import BrandingContainer from '@/components/BrandingContainer';
+import CustomCallout from '@/components/CustomCallout';
 
 
 const { width } = Dimensions.get('window');
@@ -40,11 +42,12 @@ export default function App() {
     const [selectedPlace, setSelectedPlace] = useState<Place | null>(null);
     const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const lastFetchedRef = useRef<{ center: { latitude: number; longitude: number }; radius: number } | null>(null);
-    const initialRegionTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+    const initialRegionTimeoutRef = useRef<number | NodeJS.Timeout | null>(null);
     const ignoreRegionChangeRef = useRef(true); const [filters, setFilters] = useState({
         restaurant: true,
         cafe: true,
         grocery_store: true,
+        public_bathroom: true,
     });
     const [openNowOnly, setOpenNowOnly] = useState(false);
     const insets = useSafeAreaInsets();
@@ -185,7 +188,7 @@ export default function App() {
 
 
 
-    function mapToFilterCategory(type: string | undefined): 'restaurant' | 'cafe' | 'grocery_store' | null {
+    function mapToFilterCategory(type: string | undefined): 'restaurant' | 'cafe' | 'grocery_store' | 'public_bathroom' | null {
         if (!type) return null;
 
         // Lowercase just in case
@@ -251,9 +254,12 @@ export default function App() {
                 'buffet_restaurant'
             ].includes(filter);
 
+        const publicBathroomTypes = ['public_bathroom', 'restroom', 'toilet', 'washroom', 'bathroom'];
+
         if (groceryTypes.includes(filter)) return 'grocery_store';
         if (cafeTypes.includes(filter)) return 'cafe';
         if (restaurantConditions) return 'restaurant';
+        if (publicBathroomTypes.includes(filter)) return 'public_bathroom';
 
         return null;
     }
@@ -294,7 +300,7 @@ export default function App() {
             const latRad = userRegion.latitude * (Math.PI / 180);
             const metersPerDegreeLongitude = Math.cos(latRad) * (Math.PI / 180) * 6371000;
             const widthInMeters = userRegion.longitudeDelta * metersPerDegreeLongitude;
-            const radius = widthInMeters / 2;
+            const radius = widthInMeters / 1.75;
 
             const results = await fetchNearbyPlaces(latitude, longitude, radius);
             setPlaces(results);
@@ -420,7 +426,7 @@ export default function App() {
         const latRad = region.latitude * (Math.PI / 180);
         const metersPerDegreeLongitude = Math.cos(latRad) * (Math.PI / 180) * 6371000;
         const widthInMeters = region.longitudeDelta * metersPerDegreeLongitude;
-        const radius = widthInMeters / 2;
+        const radius = widthInMeters / 1.75;
 
         const last = lastFetchedRef.current;
         if (!last) return true;
@@ -514,8 +520,10 @@ export default function App() {
         // Only return those with restrooms and correct type
         return updatedPlaces.filter(
             (place): place is Place =>
-                (place as Place)?.restroom === true ||
-                (place as Place)?.primaryType === 'public_bathroom'
+            (
+                ((place as Place)?.restroom === true ||
+                    (place as Place)?.primaryType === 'public_bathroom')
+            )
         );
     };
 
@@ -624,7 +632,7 @@ export default function App() {
                 const latRad = currentRegion.latitude * (Math.PI / 180);
                 const metersPerDegreeLongitude = Math.cos(latRad) * (Math.PI / 180) * 6371000;
                 const widthInMeters = currentRegion.longitudeDelta * metersPerDegreeLongitude;
-                const radius = widthInMeters / 2;
+                const radius = widthInMeters / 1.75;
 
                 if (isRegionCovered(currentRegion.latitude, currentRegion.longitude, radius)) {
                     setIsRegionChanged(false);
@@ -768,7 +776,7 @@ export default function App() {
                     <Text
                         style={[
                             styles.placeOpenStatus,
-                            { color: item.currentOpeningHours?.openNow ? '#059669' : '#dc2626' }, // tailwind vibes
+                            { color: item.primaryType === 'public_bathroom' || item.currentOpeningHours?.openNow ? '#059669' : '#dc2626' },
                         ]}
                     >
                         {item.currentOpeningHours?.openNow ? 'Open Now' : 'Closed'}
@@ -800,18 +808,11 @@ export default function App() {
 
 
 
-    function formatType(primaryType: string | undefined): React.ReactNode {
-        if (!primaryType) return null;
-        // Convert snake_case or underscore to Title Case
-        const formatted = primaryType
-            .replace(/_/g, ' ')
-            .replace(/\b\w/g, char => char.toUpperCase());
-        return formatted;
-    }
 
 
 
-    const toggleFilter = (filterName: 'restaurant' | 'cafe' | 'grocery_store') => {
+
+    const toggleFilter = (filterName: 'restaurant' | 'cafe' | 'grocery_store' | 'public_bathroom') => {
         setFilters(prevFilters => {
             const isOnlyThisFilterActive =
                 prevFilters[filterName] &&
@@ -823,6 +824,7 @@ export default function App() {
                     restaurant: true,
                     cafe: true,
                     grocery_store: true,
+                    public_bathroom: true,
                 };
             }
 
@@ -831,6 +833,7 @@ export default function App() {
                 restaurant: false,
                 cafe: false,
                 grocery_store: false,
+                public_bathroom: false,
                 [filterName]: true,
             };
         });
@@ -869,26 +872,16 @@ export default function App() {
                                     tracksViewChanges={false}
                                     calloutAnchor={{ x: 0.5, y: -0.2 }}
                                 >
-                                    <Callout tooltip alphaHitTest={false}>
-                                        <View style={styles.calloutContainer}>
-                                            <Text style={styles.title} numberOfLines={1}>
-                                                {place.displayName?.text ?? 'Place'}
-                                            </Text>
-                                            {place.formattedAddress && (
-                                                <Text style={styles.address} numberOfLines={1}>
-                                                    {formatType(place.primaryType)}
-                                                </Text>
-                                            )}
-                                        </View>
-                                    </Callout>
+                                    <CustomCallout
+                                        place={place}
+                                    />
                                 </Marker>
                             ))}
                         </MapView>
                     )}
                     {/* 🧻 Branding - moved OUT of MapView */}
-                    <View style={[styles.brandingContainer, { top: insets.top + 10, position: 'absolute' }]}>
-                        <Text style={styles.brandingText}>PottyPal 🧻</Text>
-                    </View>
+                    <BrandingContainer />
+
 
                     {/* 🔍 Search This Area - moved OUT of MapView */}
                     {isRegionChanged && (
@@ -920,7 +913,7 @@ export default function App() {
 
                     {/* 🔘 Filter Buttons */}
                     <View style={[styles.filterContainer, { position: 'absolute' }]}>
-                        <TouchableOpacity
+                        {/* <TouchableOpacity
                             onPress={() => setFilters({ restaurant: true, cafe: true, grocery_store: true })}
                             style={[
                                 styles.filterButton,
@@ -928,7 +921,7 @@ export default function App() {
                             ]}
                         >
                             <MaterialCommunityIcons name="select-all" size={24} color={Object.values(filters).every(v => v) ? 'white' : '#333'} />
-                        </TouchableOpacity>
+                        </TouchableOpacity> */}
                         <TouchableOpacity
                             onPress={() => toggleFilter('restaurant')}
                             style={[styles.filterButton, filters.restaurant && styles.filterButtonInActive]}
@@ -946,6 +939,12 @@ export default function App() {
                             style={[styles.filterButton, filters.grocery_store && styles.filterButtonInActive]}
                         >
                             <MaterialCommunityIcons name="cart" size={24} color={filters.grocery_store ? 'white' : '#333'} />
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                            onPress={() => toggleFilter('public_bathroom')}
+                            style={[styles.filterButton, filters.public_bathroom && styles.filterButtonInActive]}
+                        >
+                            <FontAwesome6 name="toilet" size={24} color={filters.public_bathroom ? 'white' : '#333'} />
                         </TouchableOpacity>
                     </View>
 
@@ -1112,22 +1111,7 @@ const styles = StyleSheet.create({
         shadowRadius: 4,
         elevation: 6,
     },
-    brandingContainer: {
-        position: 'absolute',
-        alignSelf: 'center',
-        alignItems: 'center',
-        backgroundColor: 'rgba(255, 255, 255, 0.8)',
-        paddingVertical: 8,
-        paddingHorizontal: 16,
-        borderRadius: 25,
-        flexDirection: 'row',
-        gap: 10,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.1,
-        shadowRadius: 3,
-        elevation: 5,
-    },
+
 
     goButtonRow: {
         flexDirection: 'row',
@@ -1232,13 +1216,7 @@ const styles = StyleSheet.create({
         marginTop: 2,
     },
 
-    brandingText: {
-        fontSize: 24,
-        fontWeight: 'bold',
-        color: '#1e3a8a',
-        fontFamily: 'HelveticaNeue',
-        textShadowColor: 'rgba(30, 58, 138, 0.6)',  // softer, semi-transparent blue
-    },
+
     placeItem: {
         padding: 15,
         borderBottomWidth: 1,
