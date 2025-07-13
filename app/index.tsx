@@ -711,7 +711,7 @@ export default function App() {
                                     setShowNoBathroomsAlert(false);
                                 }, 3000); // Hide after 2.5s
 
-                            }   
+                            }
                             return merged;
                         });
 
@@ -790,7 +790,6 @@ export default function App() {
         // Replace any !3eX with !3e2 for walking
         url = url.replace(/!3e\d/, '!3e2');
 
-        console.log('Opening Google Maps with walking directions:', url);
         Linking.openURL(url);
     };
 
@@ -1056,7 +1055,7 @@ export default function App() {
                                                 }
                                             }
 
-                                            if(filteredPlaces.length === 0) {
+                                            if (filteredPlaces.length === 0) {
                                                 setIsLoading(false);
                                                 setShowNoBathroomsAlert(true);
                                             }

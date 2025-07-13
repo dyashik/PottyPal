@@ -18,7 +18,7 @@ export default function FullscreenMap() {
     const { lat, lng, name, type, walkingURL } = useLocalSearchParams();
     const router = useRouter();
     const mapRef = useRef<MapView>(null);
-    const markerRef = useRef<any>(null); 
+    const markerRef = useRef<any>(null);
 
     const latNum = parseFloat(lat as string);
     const lngNum = parseFloat(lng as string);
@@ -57,7 +57,6 @@ export default function FullscreenMap() {
         // Replace any !3eX with !3e2 for walking
         url = url.replace(/!3e\d/, '!3e2');
 
-        console.log('Opening Google Maps with walking directions:', url);
         Linking.openURL(url);
     };
 

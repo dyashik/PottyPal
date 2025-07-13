@@ -112,6 +112,7 @@ export default function PlaceDetails() {
             }, 500); // Delay slightly to ensure map and marker are ready
         }
     }, []);
+
     useEffect(() => {
         (async () => {
             let { status } = await Location.requestForegroundPermissionsAsync();
@@ -266,6 +267,17 @@ export default function PlaceDetails() {
         fast_food_restaurant: "Restroom access often requires staff to unlock it—ask at the counter.",
     };
 
+    const openGoogleMaps = (walkingURL: string) => {
+        let url = walkingURL;
+        if (!url) return;
+
+        // Replace any !3eX with !3e2 for walking
+        url = url.replace(/!3e\d/, '!3e2');
+
+        console.log('Opening Google Maps with walking directions:', url);
+        Linking.openURL(url);
+    };
+
 
     const primaryType = getPrimaryTypeFromFilter(place.primaryType ?? '');
     const entryTip = primaryType ? entryInstructionsMap[primaryType] : undefined;
@@ -321,8 +333,7 @@ export default function PlaceDetails() {
                     <TouchableOpacity
                         style={styles.actionBtn}
                         onPress={() => {
-                            console.log((place.googleMapsLinks?.directionsUri!) + '&travelmode=walking');
-                            Linking.openURL((place.googleMapsLinks?.directionsUri!) + '&travelmode=walking');
+                            openGoogleMaps((place.googleMapsLinks?.directionsUri!) + '&travelmode=walking');
                         }}
                     >
                         <View style={styles.iconTextRow}>
