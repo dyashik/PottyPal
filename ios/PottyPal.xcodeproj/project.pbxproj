@@ -8,28 +8,28 @@
 
 /* Begin PBXBuildFile section */
 		13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB51A68108700A75B9A /* Images.xcassets */; };
-		1D8076139AA8689C7842ED0C /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 96A0BB0C04B1475195E48D34 /* PrivacyInfo.xcprivacy */; };
 		3E461D99554A48A4959DE609 /* SplashScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */; };
-		413C2B966586F08FD21859BD /* libPods-PottyPal.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 4774A97ABEBAE225DA0F719A /* libPods-PottyPal.a */; };
-		43D31B0EF3E7B8147EE98C01 /* ExpoModulesProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = C40F3D748C72659B26877AC5 /* ExpoModulesProvider.swift */; };
+		7F578D35AC13C9A00A419B0A /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 07F1D048EE740CAD7214346F /* PrivacyInfo.xcprivacy */; };
 		BB2F792D24A3F905000567C9 /* Expo.plist in Resources */ = {isa = PBXBuildFile; fileRef = BB2F792C24A3F905000567C9 /* Expo.plist */; };
+		C4C9D229A06491E244D07225 /* ExpoModulesProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = FED70322C95EE366FEFF8DC4 /* ExpoModulesProvider.swift */; };
+		DA9D19F14CE418DCA9917C0F /* libPods-PottyPal.a in Frameworks */ = {isa = PBXBuildFile; fileRef = BF9359678C377EB03177ADF3 /* libPods-PottyPal.a */; };
 		F11748422D0307B40044C1D9 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = F11748412D0307B40044C1D9 /* AppDelegate.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		07F1D048EE740CAD7214346F /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; includeInIndex = 1; name = PrivacyInfo.xcprivacy; path = PottyPal/PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		13B07F961A680F5B00A75B9A /* PottyPal.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = PottyPal.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		13B07FB51A68108700A75B9A /* Images.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; name = Images.xcassets; path = PottyPal/Images.xcassets; sourceTree = "<group>"; };
 		13B07FB61A68108700A75B9A /* Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = Info.plist; path = PottyPal/Info.plist; sourceTree = "<group>"; };
-		4774A97ABEBAE225DA0F719A /* libPods-PottyPal.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-PottyPal.a"; sourceTree = BUILT_PRODUCTS_DIR; };
-		6330453F0B4B24C54D3FE516 /* Pods-PottyPal.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-PottyPal.release.xcconfig"; path = "Target Support Files/Pods-PottyPal/Pods-PottyPal.release.xcconfig"; sourceTree = "<group>"; };
-		96A0BB0C04B1475195E48D34 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; includeInIndex = 1; name = PrivacyInfo.xcprivacy; path = PottyPal/PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		A8B27C33D1C20B0838127B29 /* Pods-PottyPal.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-PottyPal.release.xcconfig"; path = "Target Support Files/Pods-PottyPal/Pods-PottyPal.release.xcconfig"; sourceTree = "<group>"; };
 		AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.storyboard; name = SplashScreen.storyboard; path = PottyPal/SplashScreen.storyboard; sourceTree = "<group>"; };
+		BA3F19EBA310BBD0281C403A /* Pods-PottyPal.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-PottyPal.debug.xcconfig"; path = "Target Support Files/Pods-PottyPal/Pods-PottyPal.debug.xcconfig"; sourceTree = "<group>"; };
 		BB2F792C24A3F905000567C9 /* Expo.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; path = Expo.plist; sourceTree = "<group>"; };
-		C40F3D748C72659B26877AC5 /* ExpoModulesProvider.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ExpoModulesProvider.swift; path = "Pods/Target Support Files/Pods-PottyPal/ExpoModulesProvider.swift"; sourceTree = "<group>"; };
-		E9C18DF17D6D50BEC7116D22 /* Pods-PottyPal.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-PottyPal.debug.xcconfig"; path = "Target Support Files/Pods-PottyPal/Pods-PottyPal.debug.xcconfig"; sourceTree = "<group>"; };
+		BF9359678C377EB03177ADF3 /* libPods-PottyPal.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-PottyPal.a"; sourceTree = BUILT_PRODUCTS_DIR; };
 		ED297162215061F000B7C4FE /* JavaScriptCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = JavaScriptCore.framework; path = System/Library/Frameworks/JavaScriptCore.framework; sourceTree = SDKROOT; };
 		F11748412D0307B40044C1D9 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AppDelegate.swift; path = PottyPal/AppDelegate.swift; sourceTree = "<group>"; };
 		F11748442D0722820044C1D9 /* PottyPal-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = "PottyPal-Bridging-Header.h"; path = "PottyPal/PottyPal-Bridging-Header.h"; sourceTree = "<group>"; };
+		FED70322C95EE366FEFF8DC4 /* ExpoModulesProvider.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ExpoModulesProvider.swift; path = "Pods/Target Support Files/Pods-PottyPal/ExpoModulesProvider.swift"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -37,7 +37,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				413C2B966586F08FD21859BD /* libPods-PottyPal.a in Frameworks */,
+				DA9D19F14CE418DCA9917C0F /* libPods-PottyPal.a in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -53,16 +53,16 @@
 				13B07FB51A68108700A75B9A /* Images.xcassets */,
 				13B07FB61A68108700A75B9A /* Info.plist */,
 				AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */,
-				96A0BB0C04B1475195E48D34 /* PrivacyInfo.xcprivacy */,
+				07F1D048EE740CAD7214346F /* PrivacyInfo.xcprivacy */,
 			);
 			name = PottyPal;
 			sourceTree = "<group>";
 		};
-		1F838D494A10CDEAD94706A5 /* Pods */ = {
+		1647B7BBFD612E13FE45AE51 /* Pods */ = {
 			isa = PBXGroup;
 			children = (
-				E9C18DF17D6D50BEC7116D22 /* Pods-PottyPal.debug.xcconfig */,
-				6330453F0B4B24C54D3FE516 /* Pods-PottyPal.release.xcconfig */,
+				BA3F19EBA310BBD0281C403A /* Pods-PottyPal.debug.xcconfig */,
+				A8B27C33D1C20B0838127B29 /* Pods-PottyPal.release.xcconfig */,
 			);
 			name = Pods;
 			path = Pods;
@@ -72,9 +72,17 @@
 			isa = PBXGroup;
 			children = (
 				ED297162215061F000B7C4FE /* JavaScriptCore.framework */,
-				4774A97ABEBAE225DA0F719A /* libPods-PottyPal.a */,
+				BF9359678C377EB03177ADF3 /* libPods-PottyPal.a */,
 			);
 			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		6B7183BEB54A4D275D9D49BA /* ExpoModulesProviders */ = {
+			isa = PBXGroup;
+			children = (
+				D09D78B2E7B86DD6F293F807 /* PottyPal */,
+			);
+			name = ExpoModulesProviders;
 			sourceTree = "<group>";
 		};
 		832341AE1AAA6A7D00B99B32 /* Libraries */ = {
@@ -91,8 +99,8 @@
 				832341AE1AAA6A7D00B99B32 /* Libraries */,
 				83CBBA001A601CBA00E9B192 /* Products */,
 				2D16E6871FA4F8E400B85C8A /* Frameworks */,
-				1F838D494A10CDEAD94706A5 /* Pods */,
-				B03544A11E2FFA37E746CDDD /* ExpoModulesProviders */,
+				1647B7BBFD612E13FE45AE51 /* Pods */,
+				6B7183BEB54A4D275D9D49BA /* ExpoModulesProviders */,
 			);
 			indentWidth = 2;
 			sourceTree = "<group>";
@@ -107,14 +115,6 @@
 			name = Products;
 			sourceTree = "<group>";
 		};
-		B03544A11E2FFA37E746CDDD /* ExpoModulesProviders */ = {
-			isa = PBXGroup;
-			children = (
-				BE023FE02403E5FF3BD8B8CD /* PottyPal */,
-			);
-			name = ExpoModulesProviders;
-			sourceTree = "<group>";
-		};
 		BB2F792B24A3F905000567C9 /* Supporting */ = {
 			isa = PBXGroup;
 			children = (
@@ -124,10 +124,10 @@
 			path = PottyPal/Supporting;
 			sourceTree = "<group>";
 		};
-		BE023FE02403E5FF3BD8B8CD /* PottyPal */ = {
+		D09D78B2E7B86DD6F293F807 /* PottyPal */ = {
 			isa = PBXGroup;
 			children = (
-				C40F3D748C72659B26877AC5 /* ExpoModulesProvider.swift */,
+				FED70322C95EE366FEFF8DC4 /* ExpoModulesProvider.swift */,
 			);
 			name = PottyPal;
 			sourceTree = "<group>";
@@ -140,13 +140,13 @@
 			buildConfigurationList = 13B07F931A680F5B00A75B9A /* Build configuration list for PBXNativeTarget "PottyPal" */;
 			buildPhases = (
 				08A4A3CD28434E44B6B9DE2E /* [CP] Check Pods Manifest.lock */,
-				03051BE3683AA8A08B48972B /* [Expo] Configure project */,
+				26FC26BDC4627E226275592C /* [Expo] Configure project */,
 				13B07F871A680F5B00A75B9A /* Sources */,
 				13B07F8C1A680F5B00A75B9A /* Frameworks */,
 				13B07F8E1A680F5B00A75B9A /* Resources */,
 				00DD1BFF1BD5951E006B06BC /* Bundle React Native code and images */,
 				800E24972A6A228C8D4807E9 /* [CP] Copy Pods Resources */,
-				6E3159BC1A839DEA18916FBE /* [CP] Embed Pods Frameworks */,
+				6B4026674C1D501F9F62768F /* [CP] Embed Pods Frameworks */,
 			);
 			buildRules = (
 			);
@@ -196,7 +196,7 @@
 				BB2F792D24A3F905000567C9 /* Expo.plist in Resources */,
 				13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */,
 				3E461D99554A48A4959DE609 /* SplashScreen.storyboard in Resources */,
-				1D8076139AA8689C7842ED0C /* PrivacyInfo.xcprivacy in Resources */,
+				7F578D35AC13C9A00A419B0A /* PrivacyInfo.xcprivacy in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -217,25 +217,6 @@
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
 			shellScript = "if [[ -f \"$PODS_ROOT/../.xcode.env\" ]]; then\n  source \"$PODS_ROOT/../.xcode.env\"\nfi\nif [[ -f \"$PODS_ROOT/../.xcode.env.local\" ]]; then\n  source \"$PODS_ROOT/../.xcode.env.local\"\nfi\n\n# The project root by default is one level up from the ios directory\nexport PROJECT_ROOT=\"$PROJECT_DIR\"/..\n\nif [[ \"$CONFIGURATION\" = *Debug* ]]; then\n  export SKIP_BUNDLING=1\nfi\nif [[ -z \"$ENTRY_FILE\" ]]; then\n  # Set the entry JS file using the bundler's entry resolution.\n  export ENTRY_FILE=\"$(\"$NODE_BINARY\" -e \"require('expo/scripts/resolveAppEntry')\" \"$PROJECT_ROOT\" ios absolute | tail -n 1)\"\nfi\n\nif [[ -z \"$CLI_PATH\" ]]; then\n  # Use Expo CLI\n  export CLI_PATH=\"$(\"$NODE_BINARY\" --print \"require.resolve('@expo/cli', { paths: [require.resolve('expo/package.json')] })\")\"\nfi\nif [[ -z \"$BUNDLE_COMMAND\" ]]; then\n  # Default Expo CLI command for bundling\n  export BUNDLE_COMMAND=\"export:embed\"\nfi\n\n# Source .xcode.env.updates if it exists to allow\n# SKIP_BUNDLING to be unset if needed\nif [[ -f \"$PODS_ROOT/../.xcode.env.updates\" ]]; then\n  source \"$PODS_ROOT/../.xcode.env.updates\"\nfi\n# Source local changes to allow overrides\n# if needed\nif [[ -f \"$PODS_ROOT/../.xcode.env.local\" ]]; then\n  source \"$PODS_ROOT/../.xcode.env.local\"\nfi\n\n`\"$NODE_BINARY\" --print \"require('path').dirname(require.resolve('react-native/package.json')) + '/scripts/react-native-xcode.sh'\"`\n\n";
-		};
-		03051BE3683AA8A08B48972B /* [Expo] Configure project */ = {
-			isa = PBXShellScriptBuildPhase;
-			alwaysOutOfDate = 1;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			inputFileListPaths = (
-			);
-			inputPaths = (
-			);
-			name = "[Expo] Configure project";
-			outputFileListPaths = (
-			);
-			outputPaths = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-			shellPath = /bin/sh;
-			shellScript = "# This script configures Expo modules and generates the modules provider file.\nbash -l -c \"./Pods/Target\\ Support\\ Files/Pods-PottyPal/expo-configure-project.sh\"\n";
 		};
 		08A4A3CD28434E44B6B9DE2E /* [CP] Check Pods Manifest.lock */ = {
 			isa = PBXShellScriptBuildPhase;
@@ -259,7 +240,26 @@
 			shellScript = "diff \"${PODS_PODFILE_DIR_PATH}/Podfile.lock\" \"${PODS_ROOT}/Manifest.lock\" > /dev/null\nif [ $? != 0 ] ; then\n    # print error to STDERR\n    echo \"error: The sandbox is not in sync with the Podfile.lock. Run 'pod install' or update your CocoaPods installation.\" >&2\n    exit 1\nfi\n# This output is used by Xcode 'outputs' to avoid re-running this script phase.\necho \"SUCCESS\" > \"${SCRIPT_OUTPUT_FILE_0}\"\n";
 			showEnvVarsInLog = 0;
 		};
-		6E3159BC1A839DEA18916FBE /* [CP] Embed Pods Frameworks */ = {
+		26FC26BDC4627E226275592C /* [Expo] Configure project */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "[Expo] Configure project";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "# This script configures Expo modules and generates the modules provider file.\nbash -l -c \"./Pods/Target\\ Support\\ Files/Pods-PottyPal/expo-configure-project.sh\"\n";
+		};
+		6B4026674C1D501F9F62768F /* [CP] Embed Pods Frameworks */ = {
 			isa = PBXShellScriptBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -329,7 +329,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				F11748422D0307B40044C1D9 /* AppDelegate.swift in Sources */,
-				43D31B0EF3E7B8147EE98C01 /* ExpoModulesProvider.swift in Sources */,
+				C4C9D229A06491E244D07225 /* ExpoModulesProvider.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -338,7 +338,7 @@
 /* Begin XCBuildConfiguration section */
 		13B07F941A680F5B00A75B9A /* Debug */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = E9C18DF17D6D50BEC7116D22 /* Pods-PottyPal.debug.xcconfig */;
+			baseConfigurationReference = BA3F19EBA310BBD0281C403A /* Pods-PottyPal.debug.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
@@ -375,7 +375,7 @@
 		};
 		13B07F951A680F5B00A75B9A /* Release */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = 6330453F0B4B24C54D3FE516 /* Pods-PottyPal.release.xcconfig */;
+			baseConfigurationReference = A8B27C33D1C20B0838127B29 /* Pods-PottyPal.release.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
