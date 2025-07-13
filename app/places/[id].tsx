@@ -553,7 +553,7 @@ const styles = StyleSheet.create({
         fontSize: normalize(18),
         color: '#4b5563',
         textAlign: 'center',
-        marginBottom: 10,
+        marginVertical: 8,
     },
     actionBtn: {
         backgroundColor: '#1e3a8a',

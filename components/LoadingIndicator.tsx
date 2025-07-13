@@ -6,7 +6,7 @@ interface LoadingIndicatorProps {
     size?: number;
 }
 
-const LoadingIndicator: React.FC<LoadingIndicatorProps> = ({ size = 80 }) => {
+const LoadingIndicator: React.FC<LoadingIndicatorProps> = ({ size = 45 }) => {
     // Animation value for rotation
     const spinValue = new Animated.Value(0);
 
@@ -34,12 +34,11 @@ const LoadingIndicator: React.FC<LoadingIndicatorProps> = ({ size = 80 }) => {
             <View style={styles.loadingBox}>
                 <Animated.View style={{ transform: [{ rotate: spin }] }}>
                     <Image
-                        source={require('../assets/icon.png')}
+                        source={require('../assets/images/icon-transparent.png')}
                         style={{ width: size, height: size }}
                         contentFit="contain"
                     />
                 </Animated.View>
-                <View style={styles.shadow} />
             </View>
         </View>
     );
@@ -54,13 +53,13 @@ const styles = StyleSheet.create({
         bottom: 0,
         justifyContent: 'center',
         alignItems: 'center',
-        backgroundColor: 'rgba(255, 255, 255, 0.7)',
+        backgroundColor: 'rgba(255, 255, 255, 0)',
         zIndex: 1000,
     },
     loadingBox: {
         justifyContent: 'center',
         alignItems: 'center',
-        padding: 20,
+        padding: 10,
         borderRadius: 16,
         backgroundColor: 'white',
         shadowColor: '#000',
@@ -72,7 +71,7 @@ const styles = StyleSheet.create({
     shadow: {
         position: 'absolute',
         bottom: -5,
-        width: 60,
+        width: 45,
         height: 10,
         borderRadius: 50,
         backgroundColor: 'rgba(0,0,0,0.1)',

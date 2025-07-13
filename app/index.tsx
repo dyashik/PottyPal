@@ -10,6 +10,7 @@ import {
     useColorScheme,
     Platform,
     InteractionManager,
+    Modal,
 } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import { useRouter } from 'expo-router';
@@ -28,6 +29,7 @@ import { Portal, PortalProvider } from '@gorhom/portal';
 import { Image } from 'expo-image';
 import BrandingContainer from '@/components/BrandingContainer';
 import CustomCallout from '@/components/CustomCallout';
+import LoadingIndicator from '@/components/LoadingIndicator';
 
 
 const { width } = Dimensions.get('window');
@@ -52,8 +54,10 @@ export default function App() {
     const [openNowOnly, setOpenNowOnly] = useState(false);
     const insets = useSafeAreaInsets();
     const router = useRouter();
-
+    const [showNoBathroomsAlert, setShowNoBathroomsAlert] = useState(true);
     const [sortType, setSortType] = useState<'distance' | 'popularity'>('distance');
+    const [isLoading, setIsLoading] = useState(false);
+    const [loadingTimeout, setLoadingTimeout] = useState<number | null>(null);
     const pottyPalMapStyle = [
         {
             elementType: 'geometry',
@@ -75,7 +79,7 @@ export default function App() {
         {
             featureType: 'poi',
             elementType: 'labels',
-            stylers: [{ visibility: 'off' }], // Hide all POI labels
+            stylers: [{ visibility: 'on' }], // Hide all POI labels
         },
         {
             featureType: 'poi.park',
@@ -188,6 +192,8 @@ export default function App() {
 
 
 
+
+
     function mapToFilterCategory(type: string | undefined): 'restaurant' | 'cafe' | 'grocery_store' | 'public_bathroom' | null {
         if (!type) return null;
 
@@ -270,6 +276,26 @@ export default function App() {
         return filters[category] && (!openNowOnly || place.currentOpeningHours?.openNow);
     });
 
+    useEffect(() => {
+        if (filteredPlaces == null) {
+            return;
+        }
+
+        // if(isLoading) {
+        //     setShowNoBathroomsAlert(false);
+        //     return;
+        // }
+
+        if (filteredPlaces != null && filteredPlaces.length == 0) {
+            setIsLoading(false);
+            setShowNoBathroomsAlert(true);
+        } else if (filteredPlaces != null && filteredPlaces.length > 0) {
+            setShowNoBathroomsAlert(false);
+            setIsLoading(false);
+        }
+        setShowNoBathroomsAlert(false);
+    }, [filteredPlaces.length]);
+
     const snapPoints = useMemo(() => {    // Use immediate timeout to break out of potential batching
         return selectedPlace ? ['31%'] : ['13%', '50%'];
     }, [selectedPlace]);
@@ -302,7 +328,9 @@ export default function App() {
             const widthInMeters = userRegion.longitudeDelta * metersPerDegreeLongitude;
             const radius = widthInMeters / 1.75;
 
+            setShowNoBathroomsAlert(false);
             const results = await fetchNearbyPlaces(latitude, longitude, radius);
+            setShowNoBathroomsAlert(false);
             setPlaces(results);
 
             if (mapRef.current && results.length > 0) {
@@ -320,7 +348,7 @@ export default function App() {
                 if (initialRegionTimeoutRef.current) clearTimeout(initialRegionTimeoutRef.current);
                 initialRegionTimeoutRef.current = setTimeout(() => {
                     ignoreRegionChangeRef.current = false;
-                }, 2500);
+                }, 3500);
 
             }
         })();
@@ -329,6 +357,7 @@ export default function App() {
             // Proper cleanup
             if (initialRegionTimeoutRef.current) clearTimeout(initialRegionTimeoutRef.current);
             if (debounceRef.current) clearTimeout(debounceRef.current);
+            if (loadingTimeout) clearTimeout(loadingTimeout);
         };
     }, []);
 
@@ -446,85 +475,100 @@ export default function App() {
         longitude: number,
         radius: number
     ): Promise<Place[]> => {
-        const apiKey = getGoogleMapsKey(true);
-        if (!apiKey) throw new Error("Google API key is missing");
+        // Only show loading indicator if fetch takes more than 500ms
+        const loadingTimer = setTimeout(() => {
+            setIsLoading(true);
+        }, 500);
+        setLoadingTimeout(loadingTimer);
 
-        const body = {
-            includedTypes: [
-                "fast_food_restaurant",
-                "restaurant",
-                "cafe",
-                "bar",
-                "coffee_shop",
-                "grocery_store",
-                "supermarket",
-                "public_bathroom",
-                "convenience_store",
-            ],
-            maxResultCount: 20,
-            rankPreference: "DISTANCE",
-            locationRestriction: {
-                circle: {
-                    center: { latitude, longitude },
-                    radius,
+        try {
+            const apiKey = getGoogleMapsKey(true);
+            if (!apiKey) throw new Error("Google API key is missing");
+
+            const body = {
+                includedTypes: [
+                    "fast_food_restaurant",
+                    "restaurant",
+                    "cafe",
+                    "bar",
+                    "coffee_shop",
+                    "grocery_store",
+                    "supermarket",
+                    "public_bathroom",
+                    "convenience_store",
+                ],
+                maxResultCount: 20,
+                rankPreference: "DISTANCE",
+                locationRestriction: {
+                    circle: {
+                        center: { latitude, longitude },
+                        radius,
+                    },
                 },
-            },
-        };
+            };
 
-        const response = await fetch(
-            "https://places.googleapis.com/v1/places:searchNearby",
-            {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                    "X-Goog-Api-Key": apiKey as string,
-                    "X-Goog-FieldMask":
-                        "places.displayName,places.formattedAddress,places.location,places.rating,places.userRatingCount,places.restroom,places.accessibilityOptions,places.primaryType,places.googleMapsUri,places.googleMapsLinks.directionsUri,places.googleMapsLinks.placeUri,places.currentOpeningHours.openNow,places.currentOpeningHours.weekdayDescriptions",
-                } as Record<string, string>,
-                body: JSON.stringify(body),
-            }
-        );
-
-        const data: FetchNearbyPlacesResponse = await response.json();
-
-        if (!data.places) return [];
-
-        // Enhance each place with distance info
-        const updatedPlaces = await Promise.all(
-            data.places.map(async (place) => {
-                if (!place.location) return place;
-
-                try {
-                    const distanceInfo = await fetchWalkingTimeAndDistance(place);
-                    // Ensure distanceInfo has both walking and driving keys
-                    if (
-                        distanceInfo &&
-                        typeof distanceInfo === 'object' &&
-                        'walking' in distanceInfo &&
-                        'driving' in distanceInfo
-                    ) {
-                        return {
-                            ...place,
-                            distanceInfo,
-                        } as Place;
-                    } else {
-                        return place;
-                    }
-                } catch (err) {
-                    console.warn("Error fetching distance for place:", place.displayName?.text);
-                    return place; // fallback to original if fetch fails
+            const response = await fetch(
+                "https://places.googleapis.com/v1/places:searchNearby",
+                {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "X-Goog-Api-Key": apiKey as string,
+                        "X-Goog-FieldMask":
+                            "places.displayName,places.formattedAddress,places.location,places.rating,places.userRatingCount,places.restroom,places.accessibilityOptions,places.primaryType,places.googleMapsUri,places.googleMapsLinks.directionsUri,places.googleMapsLinks.placeUri,places.currentOpeningHours.openNow,places.currentOpeningHours.weekdayDescriptions",
+                    } as Record<string, string>,
+                    body: JSON.stringify(body),
                 }
-            })
-        );
+            );
 
-        // Only return those with restrooms and correct type
-        return updatedPlaces.filter(
-            (place): place is Place =>
-            (
-                ((place as Place)?.restroom === true ||
-                    (place as Place)?.primaryType === 'public_bathroom')
-            )
-        );
+            const data: FetchNearbyPlacesResponse = await response.json();
+
+            if (!data.places) return [];
+
+            // Enhance each place with distance info
+            const updatedPlaces = await Promise.all(
+                data.places.map(async (place) => {
+                    if (!place.location) return place;
+
+                    try {
+                        const distanceInfo = await fetchWalkingTimeAndDistance(place);
+                        // Ensure distanceInfo has both walking and driving keys
+                        if (
+                            distanceInfo &&
+                            typeof distanceInfo === 'object' &&
+                            'walking' in distanceInfo &&
+                            'driving' in distanceInfo
+                        ) {
+                            return {
+                                ...place,
+                                distanceInfo,
+                            } as Place;
+                        } else {
+                            return place;
+                        }
+                    } catch (err) {
+                        console.warn("Error fetching distance for place:", place.displayName?.text);
+                        return place; // fallback to original if fetch fails
+                    }
+                })
+            );
+
+            // Only return those with restrooms and correct type
+            return updatedPlaces.filter(
+                (place): place is Place =>
+                (
+                    ((place as Place)?.restroom === true ||
+                        (place as Place)?.primaryType === 'public_bathroom')
+                )
+            );
+        } catch (error) {
+            console.error("Error fetching places:", error);
+            return [];
+        } finally {
+            // Clear timeout and hide loading indicator
+            if (loadingTimeout) clearTimeout(loadingTimeout);
+            setIsLoading(false);
+        }
     };
 
 
@@ -598,6 +642,7 @@ export default function App() {
 
     const searchNewBathroom = () => {
         if (!region) {
+            setIsLoading(false);
             return;
         }
 
@@ -618,6 +663,12 @@ export default function App() {
         debounceRef.current = setTimeout(() => {
             InteractionManager.runAfterInteractions(() => {
 
+                // Show loading after a delay if the fetch is still ongoing
+                const loadingTimer = setTimeout(() => {
+                    setIsLoading(true);
+                }, 500);
+                setLoadingTimeout(loadingTimer);
+
                 // 👇 All your logic stays the same here
                 if (lastRequestIdRef.current !== requestId) {
                     return;
@@ -625,6 +676,7 @@ export default function App() {
 
                 const shouldFetch = shouldFetchNewData(currentRegion);
                 if (!shouldFetch) {
+                    setIsLoading(false);
                     setIsRegionChanged(false);
                     return;
                 }
@@ -635,13 +687,30 @@ export default function App() {
                 const radius = widthInMeters / 1.75;
 
                 if (isRegionCovered(currentRegion.latitude, currentRegion.longitude, radius)) {
+                    setIsLoading(false);
                     setIsRegionChanged(false);
                     return;
                 }
 
                 fetchNearbyPlaces(currentRegion.latitude, currentRegion.longitude, radius)
                     .then(newPlaces => {
-                        setPlaces(oldPlaces => mergeUniquePlaces(oldPlaces, newPlaces));
+                        setIsRegionChanged(false);
+
+                        setPlaces(oldPlaces => {
+                            const merged = mergeUniquePlaces(oldPlaces, newPlaces);
+                            // If no new bathrooms were added, show alert
+                            if (merged.length === oldPlaces.length) {
+                                
+                                setShowNoBathroomsAlert(true);
+                                setTimeout(() => {
+                                    setIsLoading(false);
+                                    setShowNoBathroomsAlert(false);
+                                }, 3500); // Hide after 2.5s
+
+                            }
+                            return merged;
+                        });
+
                         lastFetchedRef.current = {
                             center: { latitude: currentRegion.latitude, longitude: currentRegion.longitude },
                             radius,
@@ -651,23 +720,18 @@ export default function App() {
                             longitude: currentRegion.longitude,
                             radius,
                         });
-                        setIsRegionChanged(false);
                     })
                     .catch(err => {
                         console.error("Error fetching places:", err);
                         setIsRegionChanged(false);
+                        setIsLoading(false);
+                    })
+                    .finally(() => {
+                        setIsLoading(false);
+                        if (loadingTimeout) clearTimeout(loadingTimeout);
                     });
             });
         }, 700);
-
-        // Wait 700ms before clearing the timeout (to match debounce delay)
-        setTimeout(() => {
-            if (debounceRef.current) {
-                clearTimeout(debounceRef.current);
-                debounceRef.current = null;
-            }
-        }, 700);
-
     }
 
     const isRegionCovered = (lat: number, lng: number, radius: number): boolean => {
@@ -944,7 +1008,7 @@ export default function App() {
                             onPress={() => toggleFilter('public_bathroom')}
                             style={[styles.filterButton, filters.public_bathroom && styles.filterButtonInActive]}
                         >
-                            <FontAwesome6 name="toilet" size={24} color={filters.public_bathroom ? 'white' : '#333'} />
+                            <FontAwesome5 name="toilet" size={24} color={filters.public_bathroom ? 'white' : '#333'} />
                         </TouchableOpacity>
                     </View>
 
@@ -962,7 +1026,22 @@ export default function App() {
                             {!selectedPlace && (
                                 <View style={{ paddingHorizontal: 20, paddingVertical: 5, paddingTop: 11, paddingBottom: 16 }}>
                                     <Text style={{ fontSize: 29, paddingVertical: 15, fontWeight: '600', color: '#1e3a8a', textAlign: 'center' }}>
-                                        {filteredPlaces.length} Bathroom{filteredPlaces.length === 1 ? '' : 's'} Found
+                                        {filteredPlaces.length}{" "}
+                                        {(() => {
+                                            const activeFilters = Object.entries(filters).filter(([_, v]) => v).map(([k]) => k);
+                                            if (activeFilters.length === 4) return "Bathroom" + (filteredPlaces.length === 1 ? "" : "s");
+                                            if (activeFilters.length === 1) {
+                                                switch (activeFilters[0]) {
+                                                    case "restaurant": return "Restaurant" + (filteredPlaces.length === 1 ? "" : "s");
+                                                    case "cafe": return "Cafe" + (filteredPlaces.length === 1 ? "" : "s");
+                                                    case "grocery_store": return "Grocery Store" + (filteredPlaces.length === 1 ? "" : "s");
+                                                    case "public_bathroom": return "Public Bathroom" + (filteredPlaces.length === 1 ? "" : "s");
+                                                    default: return "Bathroom" + (filteredPlaces.length === 1 ? "" : "s");
+                                                }
+                                            }
+                                            // Multiple selected, but not all
+                                            return "Bathroom" + (filteredPlaces.length === 1 ? "" : "s");
+                                        })()} Found
                                     </Text>
                                 </View>
                             )}
@@ -1043,6 +1122,41 @@ export default function App() {
                                             </Text>
                                         </TouchableOpacity>
                                     </View>
+
+                                    <Modal
+                                        transparent
+                                        animationType="fade"
+                                        visible={showNoBathroomsAlert}
+                                        onRequestClose={() => setShowNoBathroomsAlert(false)} // Android back button support
+                                    >
+                                        <View style={{
+                                            flex: 1,
+                                            justifyContent: 'center',
+                                            alignItems: 'center',
+                                            backgroundColor: 'rgba(0,0,0,0.15)',
+                                        }}>
+                                            <View style={{
+                                                backgroundColor: '#fff',
+                                                borderRadius: 18,
+                                                paddingVertical: 18,
+                                                paddingHorizontal: 28,
+                                                shadowColor: '#000',
+                                                shadowOffset: { width: 0, height: 2 },
+                                                shadowOpacity: 0.18,
+                                                shadowRadius: 8,
+                                                elevation: 8,
+                                                flexDirection: 'row',
+                                                alignItems: 'center',
+                                                gap: 12,
+                                            }}>
+                                                <MaterialCommunityIcons name="emoticon-sad-outline" size={32} color="#1e3a8a" />
+                                                <Text style={{ fontSize: 18, fontWeight: '700', color: '#1e3a8a' }}>
+                                                    No bathrooms found in this area!
+                                                </Text>
+                                            </View>
+                                        </View>
+                                    </Modal>
+
                                     <BottomSheetFlatList
                                         data={sortedPlaces}
                                         keyExtractor={item => item.googleMapsUri || Math.random().toString()}
@@ -1054,6 +1168,9 @@ export default function App() {
                             )}
                         </View>
                     </BottomSheet>
+
+                    {/* Add loading indicator */}
+                    {isLoading && <LoadingIndicator />}
                 </View>
             </GestureHandlerRootView >
         </PortalProvider>
