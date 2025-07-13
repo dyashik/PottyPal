@@ -306,9 +306,12 @@ export default function PlaceDetails() {
                         adjustsFontSizeToFit
                         minimumFontScale={0.7}
                     >
-                        {place.displayName?.text}
+                        {place.displayName?.text}{" "}
                     </Text>
-                    <Text style={styles.address}>🚶{place.distanceInfo?.walking?.duration} | 🚘 {place.distanceInfo?.driving?.duration} </Text>
+                    <Text style={styles.address}>
+                        🚶{place.distanceInfo?.walking?.duration} | 🚘 {place.distanceInfo?.driving?.duration}
+                        {place.accessibilityOptions?.wheelchairAccessibleRestroom && " | ♿️"}
+                    </Text>
                     <Text style={styles.typeText}>{formatType(place.primaryType)}</Text>
 
                 </View>

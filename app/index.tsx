@@ -281,15 +281,17 @@ export default function App() {
             return;
         }
 
-        // if(isLoading) {
-        //     setShowNoBathroomsAlert(false);
-        //     return;
-        // }
-
-        if (filteredPlaces != null && filteredPlaces.length == 0) {
+        if (filteredPlaces.length === 0 && !isLoading) {
             setIsLoading(false);
             setShowNoBathroomsAlert(true);
-        } else if (filteredPlaces != null && filteredPlaces.length > 0) {
+        }
+
+        if (filteredPlaces.length === 0) {
+            setIsLoading(false);
+            setShowNoBathroomsAlert(true);
+        }
+
+        if (filteredPlaces != null && filteredPlaces.length > 0) {
             setShowNoBathroomsAlert(false);
             setIsLoading(false);
         }
@@ -348,7 +350,9 @@ export default function App() {
                 if (initialRegionTimeoutRef.current) clearTimeout(initialRegionTimeoutRef.current);
                 initialRegionTimeoutRef.current = setTimeout(() => {
                     ignoreRegionChangeRef.current = false;
-                }, 3500);
+                }, 3000);
+
+                setShowNoBathroomsAlert(false);
 
             }
         })();
@@ -700,14 +704,14 @@ export default function App() {
                             const merged = mergeUniquePlaces(oldPlaces, newPlaces);
                             // If no new bathrooms were added, show alert
                             if (merged.length === oldPlaces.length) {
-                                
+
                                 setShowNoBathroomsAlert(true);
                                 setTimeout(() => {
                                     setIsLoading(false);
                                     setShowNoBathroomsAlert(false);
-                                }, 3500); // Hide after 2.5s
+                                }, 3000); // Hide after 2.5s
 
-                            }
+                            }   
                             return merged;
                         });
 
@@ -882,24 +886,36 @@ export default function App() {
                 prevFilters[filterName] &&
                 Object.entries(prevFilters).filter(([key, val]) => val).length === 1;
 
-            // If only the clicked one is active → reset all to true
+            let newFilters;
             if (isOnlyThisFilterActive) {
-                return {
+                newFilters = {
                     restaurant: true,
                     cafe: true,
                     grocery_store: true,
                     public_bathroom: true,
                 };
+            } else {
+                newFilters = {
+                    restaurant: false,
+                    cafe: false,
+                    grocery_store: false,
+                    public_bathroom: false,
+                    [filterName]: true,
+                };
             }
 
-            // Else → activate only the clicked one
-            return {
-                restaurant: false,
-                cafe: false,
-                grocery_store: false,
-                public_bathroom: false,
-                [filterName]: true,
-            };
+            // Check if the new filter selection results in zero bathrooms
+            const categoryPlaces = places.filter(place => {
+                const category = mapToFilterCategory(place.primaryType);
+                if (!category) return false;
+                return newFilters[category] && (!openNowOnly || place.currentOpeningHours?.openNow);
+            });
+
+            if (categoryPlaces.length === 0) {
+                setShowNoBathroomsAlert(true);
+            }
+
+            return newFilters;
         });
     };
 
@@ -1038,6 +1054,11 @@ export default function App() {
                                                     case "public_bathroom": return "Public Bathroom" + (filteredPlaces.length === 1 ? "" : "s");
                                                     default: return "Bathroom" + (filteredPlaces.length === 1 ? "" : "s");
                                                 }
+                                            }
+
+                                            if(filteredPlaces.length === 0) {
+                                                setIsLoading(false);
+                                                setShowNoBathroomsAlert(true);
                                             }
                                             // Multiple selected, but not all
                                             return "Bathroom" + (filteredPlaces.length === 1 ? "" : "s");
