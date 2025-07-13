@@ -3,7 +3,7 @@ PODS:
   - DoubleConversion (1.1.6)
   - EXConstants (17.1.7):
     - ExpoModulesCore
-  - Expo (53.0.17):
+  - Expo (53.0.19):
     - DoubleConversion
     - ExpoModulesCore
     - glog
@@ -92,11 +92,14 @@ PODS:
   - glog (0.3.5)
   - Google-Maps-iOS-Utils (5.0.0):
     - GoogleMaps (~> 8.0)
+  - Google-Mobile-Ads-SDK (12.4.0):
+    - GoogleUserMessagingPlatform (>= 1.1)
   - GoogleMaps (8.4.0):
     - GoogleMaps/Maps (= 8.4.0)
   - GoogleMaps/Base (8.4.0)
   - GoogleMaps/Maps (8.4.0):
     - GoogleMaps/Base
+  - GoogleUserMessagingPlatform (3.0.0)
   - hermes-engine (0.79.5):
     - hermes-engine/Pre-built (= 0.79.5)
   - hermes-engine/Pre-built (0.79.5)
@@ -1920,6 +1923,32 @@ PODS:
     - ReactCommon/turbomodule/bridging
     - ReactCommon/turbomodule/core
     - Yoga
+  - RNGoogleMobileAds (15.4.0):
+    - DoubleConversion
+    - glog
+    - Google-Mobile-Ads-SDK (= 12.4.0)
+    - GoogleUserMessagingPlatform (= 3.0.0)
+    - hermes-engine
+    - RCT-Folly (= 2024.11.18.00)
+    - RCTRequired
+    - RCTTypeSafety
+    - React-Core
+    - React-debug
+    - React-Fabric
+    - React-featureflags
+    - React-graphics
+    - React-hermes
+    - React-ImageManager
+    - React-jsi
+    - React-NativeModulesApple
+    - React-RCTFabric
+    - React-renderercss
+    - React-rendererdebug
+    - React-utils
+    - ReactCodegen
+    - ReactCommon/turbomodule/bridging
+    - ReactCommon/turbomodule/core
+    - Yoga
   - RNReanimated (3.17.5):
     - DoubleConversion
     - glog
@@ -2254,6 +2283,7 @@ DEPENDENCIES:
   - "RNCPicker (from `../node_modules/@react-native-picker/picker`)"
   - "RNFlashList (from `../node_modules/@shopify/flash-list`)"
   - RNGestureHandler (from `../node_modules/react-native-gesture-handler`)
+  - RNGoogleMobileAds (from `../node_modules/react-native-google-mobile-ads`)
   - RNReanimated (from `../node_modules/react-native-reanimated`)
   - RNScreens (from `../node_modules/react-native-screens`)
   - RNSVG (from `../node_modules/react-native-svg`)
@@ -2262,7 +2292,9 @@ DEPENDENCIES:
 SPEC REPOS:
   trunk:
     - Google-Maps-iOS-Utils
+    - Google-Mobile-Ads-SDK
     - GoogleMaps
+    - GoogleUserMessagingPlatform
     - libavif
     - libdav1d
     - libwebp
@@ -2460,6 +2492,8 @@ EXTERNAL SOURCES:
     :path: "../node_modules/@shopify/flash-list"
   RNGestureHandler:
     :path: "../node_modules/react-native-gesture-handler"
+  RNGoogleMobileAds:
+    :path: "../node_modules/react-native-google-mobile-ads"
   RNReanimated:
     :path: "../node_modules/react-native-reanimated"
   RNScreens:
@@ -2473,7 +2507,7 @@ SPEC CHECKSUMS:
   boost: 7e761d76ca2ce687f7cc98e698152abd03a18f90
   DoubleConversion: cb417026b2400c8f53ae97020b2be961b59470cb
   EXConstants: 9d62a46a36eae6d28cb978efcbc68aef354d1704
-  Expo: 55aa41d3906b1dfffa444435953c61e666c9d09a
+  Expo: 6e2b482fa24909b52b80ba00271e6d7742c1ef9f
   ExpoAsset: 7bdbbacf4e6752ae6e3cf70555cee076f6229e6e
   ExpoBlur: 846780b2c90f59e964b9a50385d4deb67174ebfb
   ExpoFileSystem: 9681caebda23fa1b38a12a9c68b2bade7072ce20
@@ -2493,7 +2527,9 @@ SPEC CHECKSUMS:
   fmt: a40bb5bd0294ea969aaaba240a927bd33d878cdd
   glog: 5683914934d5b6e4240e497e0f4a3b42d1854183
   Google-Maps-iOS-Utils: 66d6de12be1ce6d3742a54661e7a79cb317a9321
+  Google-Mobile-Ads-SDK: db00a3836f288f94e52114f312b56fe066699d82
   GoogleMaps: 8939898920281c649150e0af74aa291c60f2e77d
+  GoogleUserMessagingPlatform: f8d0cdad3ca835406755d0a69aa634f00e76d576
   hermes-engine: f03b0e06d3882d71e67e45b073bb827da1a21aae
   libavif: 84bbb62fb232c3018d6f1bab79beea87e35de7b7
   libdav1d: 23581a4d8ec811ff171ed5e2e05cd27bad64c39f
@@ -2568,6 +2604,7 @@ SPEC CHECKSUMS:
   RNCPicker: 620d3d6cad22e5279fbcb365f58b3f5da1935198
   RNFlashList: 30b68f572400383347ce7df3777985af0d089624
   RNGestureHandler: ccf4105b125002bd88e39d2a1f2b7e6001bcdf34
+  RNGoogleMobileAds: 8f6d63fec26c1dbd0fe0f7196c637a576c2a1956
   RNReanimated: 8b24b49fc13fce9a6e1729ccff645a63d2b7a6d1
   RNScreens: c2e3cc506212228c607b4785b315205e28acbf0f
   RNSVG: ee32efbed652c5151fd3f98bed13c68af285bc38

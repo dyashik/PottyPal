@@ -58,6 +58,7 @@ export default function App() {
     const [sortType, setSortType] = useState<'distance' | 'popularity'>('distance');
     const [isLoading, setIsLoading] = useState(false);
     const [loadingTimeout, setLoadingTimeout] = useState<number | null>(null);
+    const [maxLoadingTimeout, setMaxLoadingTimeout] = useState<number | null>(null);
     const pottyPalMapStyle = [
         {
             elementType: 'geometry',
@@ -362,6 +363,7 @@ export default function App() {
             if (initialRegionTimeoutRef.current) clearTimeout(initialRegionTimeoutRef.current);
             if (debounceRef.current) clearTimeout(debounceRef.current);
             if (loadingTimeout) clearTimeout(loadingTimeout);
+            if (maxLoadingTimeout) clearTimeout(maxLoadingTimeout);
         };
     }, []);
 
@@ -485,6 +487,15 @@ export default function App() {
         }, 500);
         setLoadingTimeout(loadingTimer);
 
+        // Maximum loading timeout of 2 seconds - stop all loading after this
+        const maxTimer = setTimeout(() => {
+            setIsLoading(false);
+            if (loadingTimeout) clearTimeout(loadingTimeout);
+            setLoadingTimeout(null);
+            console.log("Loading stopped after 2 seconds timeout");
+        }, 2000);
+        setMaxLoadingTimeout(maxTimer);
+
         try {
             const apiKey = getGoogleMapsKey(true);
             if (!apiKey) throw new Error("Google API key is missing");
@@ -569,8 +580,11 @@ export default function App() {
             console.error("Error fetching places:", error);
             return [];
         } finally {
-            // Clear timeout and hide loading indicator
+            // Clear both timeouts and hide loading indicator
             if (loadingTimeout) clearTimeout(loadingTimeout);
+            if (maxLoadingTimeout) clearTimeout(maxLoadingTimeout);
+            setLoadingTimeout(null);
+            setMaxLoadingTimeout(null);
             setIsLoading(false);
         }
     };
@@ -673,6 +687,15 @@ export default function App() {
                 }, 500);
                 setLoadingTimeout(loadingTimer);
 
+                // Maximum loading timeout of 2 seconds - stop all loading after this
+                const maxTimer = setTimeout(() => {
+                    setIsLoading(false);
+                    if (loadingTimeout) clearTimeout(loadingTimeout);
+                    setLoadingTimeout(null);
+                    console.log("Loading stopped after 2 seconds timeout in searchNewBathroom");
+                }, 2000);
+                setMaxLoadingTimeout(maxTimer);
+
                 // 👇 All your logic stays the same here
                 if (lastRequestIdRef.current !== requestId) {
                     return;
@@ -731,8 +754,12 @@ export default function App() {
                         setIsLoading(false);
                     })
                     .finally(() => {
-                        setIsLoading(false);
+                        // Clear all timeouts and hide loading indicator
                         if (loadingTimeout) clearTimeout(loadingTimeout);
+                        if (maxLoadingTimeout) clearTimeout(maxLoadingTimeout);
+                        setLoadingTimeout(null);
+                        setMaxLoadingTimeout(null);
+                        setIsLoading(false);
                     });
             });
         }, 700);

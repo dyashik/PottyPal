@@ -4,14 +4,12 @@ import { useLocalSearchParams, useNavigationContainerRef, useRouter } from 'expo
 import { usePlaceStore } from '@/utils/usePlaceStore';
 import * as Location from 'expo-location';
 const polyline = require('@mapbox/polyline');
-import * as Sharing from 'expo-sharing';
 // TEMP: Extend Place type to include 'photos' if not presentimport { BlurView } from 'expo-blur';
 import { AntDesign, Feather, FontAwesome5, Ionicons, MaterialCommunityIcons, MaterialIcons, Octicons } from '@expo/vector-icons';
-import { get } from 'react-native/Libraries/TurboModule/TurboModuleRegistry';
 import MapView, { Callout, Marker, Polyline } from 'react-native-maps';
 import getGoogleMapsApiKey from '@/config/getGoogleMapsKey';
-import { StackActions } from '@react-navigation/native';
 import CustomCallout from '@/components/CustomCallout';
+import { BannerAd, BannerAdSize, TestIds } from 'react-native-google-mobile-ads';
 
 function formatType(type?: string) {
     if (!type) return '';
@@ -370,7 +368,7 @@ export default function PlaceDetails() {
 
                 {currentLocation && place.location && (
 
-                    <View style={{ margin: 20, height: 200, borderRadius: 20, overflow: 'hidden' }}>
+                    <View style={{ margin: 20, height: 200, borderRadius: 20, marginBottom: 15, marginTop: 15, overflow: 'hidden' }}>
 
                         <MapView
                             style={{ flex: 1 }}
@@ -436,6 +434,15 @@ export default function PlaceDetails() {
                     )}
                 </View>
 
+                <View style={{ marginBottom: 20 }}>
+                    <BannerAd
+                        unitId={TestIds.BANNER}
+                        size={BannerAdSize.ANCHORED_ADAPTIVE_BANNER}
+                        requestOptions={{
+                            requestNonPersonalizedAdsOnly: false,
+                        }}
+                    />
+                </View>
 
                 {/* About Section */}
             </ScrollView>
@@ -517,6 +524,9 @@ export default function PlaceDetails() {
                 </Pressable>
 
             </Modal>
+
+
+
         </>
     );
 }
@@ -545,7 +555,7 @@ const styles = StyleSheet.create({
     },
     infoSection: {
         paddingHorizontal: 24,
-        paddingTop: 15,
+        paddingTop: 6,
         paddingBottom: 10,
         alignSelf: 'center',
     },
@@ -592,11 +602,10 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         justifyContent: 'center',
         alignItems: 'center',
-        gap: 10,
         flexWrap: 'nowrap', // make sure they don’t wrap
-        marginVertical: normalize(11),
-        columnGap: 2, // 🔥 small standard spacing
+        columnGap: 3, // 🔥 small standard spacing
         paddingHorizontal: normalize(16), // add some horizontal padding
+        marginBottom: normalize(12), // space below the buttons
     },
     iconTextRow: {
         flexDirection: 'row',
@@ -656,6 +665,7 @@ const styles = StyleSheet.create({
         shadowOpacity: 0.08,
         shadowRadius: 4,
         elevation: 2,
+        marginBottom: 12,
     },
     aboutTitle: {
         fontSize: 20,

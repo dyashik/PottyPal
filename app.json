@@ -20,7 +20,11 @@
       "config": {
         "googleMapsApiKey": "AIzaSyA924VxnZfLnvUcqN2R9kzFqNjCRTeaIAI"
       },
-      "appleTeamId": "LANP267Q8M"
+      "appleTeamId": "LANP267Q8M",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "This app needs access to your location to show nearby ads and maps.",
+        "NSLocationAlwaysUsageDescription": "This app needs your location to deliver location-based services even when the app is in the background."
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -42,6 +46,12 @@
     },
     "plugins": [
       "expo-router",
+      [
+        "react-native-google-mobile-ads",
+        {
+          "iosAppId": "ca-app-pub-3844546379677181~2775797959"
+        }
+      ],
       "expo-font"
     ],
     "experiments": {
