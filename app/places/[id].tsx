@@ -321,8 +321,29 @@ export default function PlaceDetails() {
                     <Text style={styles.address}>
                         🚶{place.distanceInfo?.walking?.duration} | 🚘 {place.distanceInfo?.driving?.duration}
                         {place.accessibilityOptions?.wheelchairAccessibleRestroom && " | ♿️"}
+                        {(formatType(place.primaryType).toLowerCase().includes('bar') || formatType(place.primaryType).toLowerCase().includes('pub')) && ' | 🔞'}
                     </Text>
-                    <Text style={styles.typeText}>{formatType(place.primaryType)}</Text>
+                    <Text style={styles.typeText}>
+                        {(() => {
+                            const type = place.primaryType?.toLowerCase() ?? '';
+                            let emoji = '';
+                            if (type.includes('restaurant')) emoji = '🍽️';
+                            else if (type.includes('cafe') || type.includes('coffee')) emoji = '☕️';
+                            else if (type.includes('bar') || type.includes('pub')) emoji = '🍺';
+                            else if (type.includes('grocery') || type.includes('supermarket')) emoji = '🛒';
+                            else if (type.includes('convenience')) emoji = '🏪';
+                            else if (type.includes('bakery')) emoji = '🥐';
+                            else if (type.includes('pharmacy') || type.includes('drugstore')) emoji = '💊';
+                            else if (type.includes('park')) emoji = '🌳';
+                            else if (type.includes('hotel') || type.includes('motel')) emoji = '🏨';
+                            else if (type.includes('public_bathroom') || type.includes('public_toilet')) emoji = '🚻';
+                            else if (type.includes('fast_food')) emoji = '🍔';
+                            else if (type.includes('library')) emoji = '📚';
+                            else if (type.includes('mall') || type.includes('shopping')) emoji = '🛍️';
+                            else emoji = '🚻';
+                            return `${formatType(place.primaryType)} ${emoji}`;
+                        })()}
+                    </Text>
 
                 </View>
 
@@ -434,7 +455,7 @@ export default function PlaceDetails() {
                     )}
                 </View>
 
-                <View style={{ marginBottom: 20 }}>
+                {/* <View style={{ marginBottom: 20 }}>
                     <BannerAd
                         unitId={TestIds.BANNER}
                         size={BannerAdSize.ANCHORED_ADAPTIVE_BANNER}
@@ -442,7 +463,7 @@ export default function PlaceDetails() {
                             requestNonPersonalizedAdsOnly: false,
                         }}
                     />
-                </View>
+                </View> */}
 
                 {/* About Section */}
             </ScrollView>

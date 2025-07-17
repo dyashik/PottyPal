@@ -201,8 +201,8 @@ export default function App() {
         // Lowercase just in case
         const filter = type.toLowerCase();
 
-        // Grocery-related
-        const groceryTypes = ['grocery_store', 'supermarket', 'convenience_store'];
+        // Grocery-related (includes gas stations and rest stops as they often have convenience items)
+        const groceryTypes = ['grocery_store', 'supermarket', 'convenience_store', 'gas_station', 'rest_stop'];
 
         // Cafe-related
         const cafeTypes = ['cafe', 'coffee_shop', 'cat_cafe', 'dog_cafe', 'tea_house', 'bagel_shop', 'juice_shop', 'candy_store', 'chocolate_shop', 'dessert_shop', 'juice_shop', 'bakery', 'ice_cream_shop'];
@@ -335,6 +335,13 @@ export default function App() {
             const results = await fetchNearbyPlaces(latitude, longitude, radius);
             setShowNoBathroomsAlert(false);
             setPlaces(results);
+
+            // Stop loading immediately after places are set
+            setIsLoading(false);
+            if (loadingTimeout) clearTimeout(loadingTimeout);
+            if (maxLoadingTimeout) clearTimeout(maxLoadingTimeout);
+            setLoadingTimeout(null);
+            setMaxLoadingTimeout(null);
 
             if (mapRef.current && results.length > 0) {
                 const coordinates = results.map(place => ({
@@ -511,6 +518,8 @@ export default function App() {
                     "supermarket",
                     "public_bathroom",
                     "convenience_store",
+                    "gas_station",
+                    "rest_stop",
                 ],
                 maxResultCount: 20,
                 rankPreference: "DISTANCE",
@@ -644,6 +653,7 @@ export default function App() {
             latitudeDelta: 0.01,
             longitudeDelta: 0.01,
         };
+        setRegion(focusRegion); // Ensure region state is updated for consistent zoom
         mapRef.current?.animateToRegion(focusRegion, 1000);
     };
 
@@ -725,15 +735,20 @@ export default function App() {
 
                         setPlaces(oldPlaces => {
                             const merged = mergeUniquePlaces(oldPlaces, newPlaces);
+
+                            // Stop loading immediately after places are merged and set
+                            setIsLoading(false);
+                            if (loadingTimeout) clearTimeout(loadingTimeout);
+                            if (maxLoadingTimeout) clearTimeout(maxLoadingTimeout);
+                            setLoadingTimeout(null);
+                            setMaxLoadingTimeout(null);
+
                             // If no new bathrooms were added, show alert
                             if (merged.length === oldPlaces.length) {
-
                                 setShowNoBathroomsAlert(true);
                                 setTimeout(() => {
-                                    setIsLoading(false);
                                     setShowNoBathroomsAlert(false);
-                                }, 3000); // Hide after 2.5s
-
+                                }, 3000); // Hide after 3s
                             }
                             return merged;
                         });
@@ -794,8 +809,8 @@ export default function App() {
             mapRef.current?.animateToRegion({
                 latitude: place.location.latitude,
                 longitude: place.location.longitude,
-                latitudeDelta: 0.005,
-                longitudeDelta: 0.005,
+                latitudeDelta: 0.0025, // much more zoomed in
+                longitudeDelta: 0.0025, // much more zoomed in
             }, 500);
         }
 
@@ -842,7 +857,45 @@ export default function App() {
         }, 50);
     };
 
+    // Refresh button handler
+    const handleRefresh = async () => {
+        // Snap to current location (same as GPS button)
+        await focusMap();
 
+        // Refetch distances and update openNow for all places
+        const updated = await Promise.all(
+            places.map(async place => {
+                let updatedPlace = { ...place };
+                try {
+                    // Refetch distance info
+                    const distanceInfo = await fetchWalkingTimeAndDistance(place);
+                    if (
+                        distanceInfo &&
+                        typeof distanceInfo === 'object' &&
+                        'walking' in distanceInfo &&
+                        'driving' in distanceInfo
+                    ) {
+                        updatedPlace.distanceInfo = distanceInfo as { walking: { duration: string; distance: string }; driving: { duration: string; distance: string } };
+                    }
+                } catch (err) {
+                    // Keep old distance info if fetch fails
+                }
+                // Try to update openNow status if possible (refetch nearby places for latest openNow)
+                // If you want to refetch all place details, you could do so here, but for now, just keep as is
+                return updatedPlace;
+            })
+        );
+        setPlaces(updated);
+        // Reset all filters to active
+        setFilters({
+            restaurant: true,
+            cafe: true,
+            grocery_store: true,
+            public_bathroom: true,
+        });
+        setOpenNowOnly(false);
+        setShowNoBathroomsAlert(false);
+    };
 
     // Render each place in bottom sheet list
     const renderPlaceItem = ({ item }: { item: Place }) => {
@@ -1010,11 +1063,16 @@ export default function App() {
                         </Animated.View>
                     )}
 
-                    {/* 🎯 GPS Button */}
-                    <View style={[styles.gpsButtonContainer, { position: 'absolute' }]}>
-                        <TouchableOpacity onPress={focusMap} style={[styles.filterButton, styles.filterButtonInActive]}>
-                            <MaterialCommunityIcons name="crosshairs-gps" size={24} color="white" />
-                        </TouchableOpacity>
+                    {/* 🎯 GPS Button & 🔄 Refresh Button (stacked vertically, styled like filter buttons) */}
+                    <View style={[styles.gpsButtonStack, { position: 'absolute', right: 5, bottom: insets.top + 45 }]}>
+                        <View style={styles.gpsButtonStackInner}>
+                            <TouchableOpacity onPress={handleRefresh} style={[styles.filterButton, styles.filterButtonInActive]}>
+                                <MaterialCommunityIcons name="refresh" size={24} color="white" />
+                            </TouchableOpacity>
+                            <TouchableOpacity onPress={focusMap} style={[styles.filterButton, styles.filterButtonInActive]}>
+                                <MaterialCommunityIcons name="crosshairs-gps" size={24} color="white" />
+                            </TouchableOpacity>
+                        </View>
                     </View>
 
                     {/* 🔘 Filter Buttons */}
@@ -1259,21 +1317,23 @@ const styles = StyleSheet.create({
         fontSize: 16,
     },
 
-    gpsButtonContainer: {
-        position: 'absolute',
-        right: 10,
-        bottom: '11%',
-        backgroundColor: 'rgba(255,255,255,0.8)',
-        borderRadius: 35, // make it a circle
-        width: 56,
-        height: 56,
-        justifyContent: 'center',
-        alignItems: 'center',
+    gpsButtonStack: {
+        // Match filter container styling
+        backgroundColor: 'rgba(255,255,255,0.85)',
+        borderRadius: 28,
+        padding: 8,
         shadowColor: '#000',
+        shadowOpacity: 0.12,
         shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-        elevation: 6,
+        shadowRadius: 6,
+        elevation: 4,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    gpsButtonStackInner: {
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
     },
 
 
