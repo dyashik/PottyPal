@@ -48,6 +48,7 @@ const styles = StyleSheet.create({
         fontSize: 24,
         fontWeight: 'bold',
         color: '#1e3a8a',
+        fontFamily: 'HelveticaNeue',
         textShadowColor: 'rgba(30, 58, 138, 0.6)',  // softer, semi-transparent blue
         lineHeight: 30,
     },
