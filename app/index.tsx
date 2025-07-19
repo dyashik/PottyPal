@@ -11,13 +11,14 @@ import {
     Platform,
     InteractionManager,
     Modal,
+    ScrollView,
 } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import { useRouter } from 'expo-router';
 import * as Location from 'expo-location';
 import { DUMMY_PLACE, FetchNearbyPlacesResponse, Place } from '@/utils/api';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
-import { FontAwesome5, FontAwesome6 } from '@expo/vector-icons';
+import { Entypo, FontAwesome5, FontAwesome6 } from '@expo/vector-icons';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import BottomSheet, { BottomSheetFlatList } from '@gorhom/bottom-sheet';
 import { usePlaceStore } from '@/utils/usePlaceStore';
@@ -50,6 +51,8 @@ export default function App() {
         cafe: true,
         grocery_store: true,
         public_bathroom: true,
+        bar: true,
+        pit_stop: true, // gas_station and rest_stop
     });
     const [openNowOnly, setOpenNowOnly] = useState(false);
     const insets = useSafeAreaInsets();
@@ -195,14 +198,14 @@ export default function App() {
 
 
 
-    function mapToFilterCategory(type: string | undefined): 'restaurant' | 'cafe' | 'grocery_store' | 'public_bathroom' | null {
+    function mapToFilterCategory(type: string | undefined): 'restaurant' | 'cafe' | 'grocery_store' | 'public_bathroom' | 'bar' | 'pit_stop' | null {
         if (!type) return null;
 
         // Lowercase just in case
         const filter = type.toLowerCase();
 
         // Grocery-related
-        const groceryTypes = ['grocery_store', 'supermarket', 'convenience_store'];
+        const groceryTypes = ['grocery_store', 'supermarket', 'market', 'convenience_store', 'liquor_store'];
 
         // Cafe-related
         const cafeTypes = ['cafe', 'coffee_shop', 'cat_cafe', 'dog_cafe', 'tea_house', 'bagel_shop', 'juice_shop', 'candy_store', 'chocolate_shop', 'dessert_shop', 'juice_shop', 'bakery', 'ice_cream_shop'];
@@ -263,8 +266,10 @@ export default function App() {
 
         const publicBathroomTypes = ['public_bathroom', 'restroom', 'toilet', 'washroom', 'bathroom'];
 
-        if (groceryTypes.includes(filter)) return 'grocery_store';
+        if (groceryTypes.includes(filter) || ['supermarket', 'market'].includes(filter)) return 'grocery_store';
         if (cafeTypes.includes(filter)) return 'cafe';
+        if (['gas_station', 'rest_stop'].includes(filter)) return 'pit_stop';
+        if (filter === 'bar') return 'bar';
         if (restaurantConditions) return 'restaurant';
         if (publicBathroomTypes.includes(filter)) return 'public_bathroom';
 
@@ -285,11 +290,13 @@ export default function App() {
         if (filteredPlaces.length === 0 && !isLoading) {
             setIsLoading(false);
             setShowNoBathroomsAlert(true);
+            setTimeout(() => setShowNoBathroomsAlert(false), 2000);
         }
 
         if (filteredPlaces.length === 0) {
             setIsLoading(false);
             setShowNoBathroomsAlert(true);
+            setTimeout(() => setShowNoBathroomsAlert(false), 2000);
         }
 
         if (filteredPlaces != null && filteredPlaces.length > 0) {
@@ -511,6 +518,11 @@ export default function App() {
                     "supermarket",
                     "public_bathroom",
                     "convenience_store",
+                    "gas_station",
+                    "rest_stop",
+                    "supermarket",
+                    "market",
+                    "liquor_store",
                 ],
                 maxResultCount: 20,
                 rankPreference: "DISTANCE",
@@ -641,10 +653,44 @@ export default function App() {
         const focusRegion = {
             latitude: location.coords.latitude,
             longitude: location.coords.longitude,
-            latitudeDelta: 0.01,
-            longitudeDelta: 0.01,
+            latitudeDelta: 0.003,
+            longitudeDelta: 0.003,
         };
         mapRef.current?.animateToRegion(focusRegion, 1000);
+    };
+
+    // Refresh button handler: zoom to current location, update all walking distances, clear checkedAreasRef
+    const handleRefresh = async () => {
+        // Zoom to current location
+        await focusMap();
+        // Clear checked areas so user can search again
+        checkedAreasRef.current = [];
+        // Update all walking distances in the list
+        setIsLoading(true);
+        try {
+            const userLocation = await Location.getCurrentPositionAsync({});
+            const updated = await Promise.all(
+                places.map(async place => {
+                    try {
+                        const distanceInfo = await fetchWalkingTimeAndDistance(place);
+                        return { ...place, distanceInfo };
+                    } catch (err) {
+                        return place;
+                    }
+                })
+            );
+            setPlaces(updated.filter(
+                (p): p is Place =>
+                    typeof p === 'object' &&
+                    p !== null &&
+                    'distanceInfo' in p &&
+                    typeof p.distanceInfo === 'object' &&
+                    'walking' in p.distanceInfo &&
+                    'driving' in p.distanceInfo
+            ));
+        } finally {
+            setIsLoading(false);
+        }
     };
 
     const onRegionChange = (region: Region) => {
@@ -732,8 +778,7 @@ export default function App() {
                                 setTimeout(() => {
                                     setIsLoading(false);
                                     setShowNoBathroomsAlert(false);
-                                }, 3000); // Hide after 2.5s
-
+                                }, 2000); // Hide after 2s
                             }
                             return merged;
                         });
@@ -794,8 +839,8 @@ export default function App() {
             mapRef.current?.animateToRegion({
                 latitude: place.location.latitude,
                 longitude: place.location.longitude,
-                latitudeDelta: 0.005,
-                longitudeDelta: 0.005,
+                latitudeDelta: 0.0025,
+                longitudeDelta: 0.0025,
             }, 500);
         }
 
@@ -828,6 +873,7 @@ export default function App() {
                 name: item.displayName?.text || 'Unnamed Place',
                 type: item.primaryType || 'Unknown',
                 walkingURL: item.googleMapsLinks?.directionsUri || '',
+                walkingTime: item.distanceInfo?.walking?.duration || '',
             }
         });
         usePlaceStore.getState().setSelectedPlace(item);
@@ -906,7 +952,7 @@ export default function App() {
 
 
 
-    const toggleFilter = (filterName: 'restaurant' | 'cafe' | 'grocery_store' | 'public_bathroom') => {
+    const toggleFilter = (filterName: 'restaurant' | 'cafe' | 'grocery_store' | 'public_bathroom' | 'bar' | 'pit_stop') => {
         setFilters(prevFilters => {
             const isOnlyThisFilterActive =
                 prevFilters[filterName] &&
@@ -919,6 +965,8 @@ export default function App() {
                     cafe: true,
                     grocery_store: true,
                     public_bathroom: true,
+                    bar: true,
+                    pit_stop: true,
                 };
             } else {
                 newFilters = {
@@ -926,6 +974,8 @@ export default function App() {
                     cafe: false,
                     grocery_store: false,
                     public_bathroom: false,
+                    bar: false,
+                    pit_stop: false,
                     [filterName]: true,
                 };
             }
@@ -939,6 +989,7 @@ export default function App() {
 
             if (categoryPlaces.length === 0) {
                 setShowNoBathroomsAlert(true);
+                setTimeout(() => setShowNoBathroomsAlert(false), 2000);
             }
 
             return newFilters;
@@ -1010,24 +1061,31 @@ export default function App() {
                         </Animated.View>
                     )}
 
-                    {/* 🎯 GPS Button */}
-                    <View style={[styles.gpsButtonContainer, { position: 'absolute' }]}>
+                    {/* 🔄 Refresh & GPS Button Group (styled exactly like filterContainer, pinned bottom right) */}
+                    <View
+                        style={[
+                            styles.filterContainer,
+                            {
+                                position: 'absolute',
+                                right: 5,
+                                bottom: 100, // adjust so it sits above BottomSheet
+                                top: 'auto',
+                                flexDirection: 'column',
+                                alignItems: 'center',
+                                zIndex: 0,
+                            }
+                        ]}
+                    >
+                        <TouchableOpacity onPress={handleRefresh} style={[styles.filterButton, styles.filterButtonInActive, { marginBottom: 5 }]}>
+                            <MaterialCommunityIcons name="refresh" size={24} color="white" />
+                        </TouchableOpacity>
                         <TouchableOpacity onPress={focusMap} style={[styles.filterButton, styles.filterButtonInActive]}>
                             <MaterialCommunityIcons name="crosshairs-gps" size={24} color="white" />
                         </TouchableOpacity>
                     </View>
 
                     {/* 🔘 Filter Buttons */}
-                    <View style={[styles.filterContainer, { position: 'absolute' }]}>
-                        {/* <TouchableOpacity
-                            onPress={() => setFilters({ restaurant: true, cafe: true, grocery_store: true })}
-                            style={[
-                                styles.filterButton,
-                                Object.values(filters).every(v => v) && styles.filterButtonInActive,
-                            ]}
-                        >
-                            <MaterialCommunityIcons name="select-all" size={24} color={Object.values(filters).every(v => v) ? 'white' : '#333'} />
-                        </TouchableOpacity> */}
+                    <ScrollView style={[styles.filterContainer, { position: 'absolute', height: 193, overflow: 'hidden' }]}>
                         <TouchableOpacity
                             onPress={() => toggleFilter('restaurant')}
                             style={[styles.filterButton, filters.restaurant && styles.filterButtonInActive]}
@@ -1052,7 +1110,19 @@ export default function App() {
                         >
                             <FontAwesome5 name="toilet" size={24} color={filters.public_bathroom ? 'white' : '#333'} />
                         </TouchableOpacity>
-                    </View>
+                        <TouchableOpacity
+                            onPress={() => toggleFilter('pit_stop')}
+                            style={[styles.filterButton, filters.pit_stop && styles.filterButtonInActive]}
+                        >
+                            <MaterialCommunityIcons name="gas-station" size={24} color={filters.pit_stop ? 'white' : '#333'} />
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                            onPress={() => toggleFilter('bar')}
+                            style={[styles.filterButton, filters.bar && styles.filterButtonInActive]}
+                        >
+                            <Entypo name="drink" size={24} color={filters.bar ? 'white' : '#333'} />
+                        </TouchableOpacity>
+                    </ScrollView>
 
 
                     <BottomSheet
@@ -1067,29 +1137,26 @@ export default function App() {
                         <View style={styles.bottomSheetInner}>
                             {!selectedPlace && (
                                 <View style={{ paddingHorizontal: 20, paddingVertical: 5, paddingTop: 11, paddingBottom: 16 }}>
-                                    <Text style={{ fontSize: 29, paddingVertical: 15, fontWeight: '600', color: '#1e3a8a', textAlign: 'center' }}>
-                                        {filteredPlaces.length}{" "}
-                                        {(() => {
-                                            const activeFilters = Object.entries(filters).filter(([_, v]) => v).map(([k]) => k);
-                                            if (activeFilters.length === 4) return "Bathroom" + (filteredPlaces.length === 1 ? "" : "s");
-                                            if (activeFilters.length === 1) {
-                                                switch (activeFilters[0]) {
-                                                    case "restaurant": return "Restaurant" + (filteredPlaces.length === 1 ? "" : "s");
-                                                    case "cafe": return "Cafe" + (filteredPlaces.length === 1 ? "" : "s");
-                                                    case "grocery_store": return "Grocery Store" + (filteredPlaces.length === 1 ? "" : "s");
-                                                    case "public_bathroom": return "Public Bathroom" + (filteredPlaces.length === 1 ? "" : "s");
-                                                    default: return "Bathroom" + (filteredPlaces.length === 1 ? "" : "s");
-                                                }
+                                    {(() => {
+                                        // Avoid setState in render: compute label only
+                                        const activeFilters = Object.entries(filters).filter(([_, v]) => v).map(([k]) => k);
+                                        let label = "Bathroom" + (filteredPlaces.length === 1 ? "" : "s");
+                                        if (activeFilters.length === 4) label = "Bathroom" + (filteredPlaces.length === 1 ? "" : "s");
+                                        else if (activeFilters.length === 1) {
+                                            switch (activeFilters[0]) {
+                                                case "restaurant": label = "Restaurant" + (filteredPlaces.length === 1 ? "" : "s"); break;
+                                                case "cafe": label = "Cafe" + (filteredPlaces.length === 1 ? "" : "s"); break;
+                                                case "grocery_store": label = "Grocery Store" + (filteredPlaces.length === 1 ? "" : "s"); break;
+                                                case "public_bathroom": label = "Public Bathroom" + (filteredPlaces.length === 1 ? "" : "s"); break;
+                                                default: label = "Bathroom" + (filteredPlaces.length === 1 ? "" : "s");
                                             }
-
-                                            if (filteredPlaces.length === 0) {
-                                                setIsLoading(false);
-                                                setShowNoBathroomsAlert(true);
-                                            }
-                                            // Multiple selected, but not all
-                                            return "Bathroom" + (filteredPlaces.length === 1 ? "" : "s");
-                                        })()} Found
-                                    </Text>
+                                        }
+                                        return (
+                                            <Text style={{ fontSize: 29, paddingVertical: 15, fontWeight: '600', color: '#1e3a8a', textAlign: 'center' }}>
+                                                {filteredPlaces.length} {label} Found
+                                            </Text>
+                                        );
+                                    })()}
                                 </View>
                             )}
 
@@ -1125,7 +1192,6 @@ export default function App() {
                                             ⭐ {selectedPlace.rating.toFixed(1)} ({selectedPlace.userRatingCount ?? 0} reviews)
                                         </Text>
                                     )}
-
                                     <Text style={styles.detailDistance}>
                                         🚶 {selectedPlace.distanceInfo?.walking
                                             ? `${selectedPlace.distanceInfo.walking.duration} (${selectedPlace.distanceInfo.walking.distance})`
@@ -1220,7 +1286,7 @@ export default function App() {
                     {isLoading && <LoadingIndicator />}
                 </View>
             </GestureHandlerRootView >
-        </PortalProvider>
+        </PortalProvider >
     );
 
 }
@@ -1258,7 +1324,6 @@ const styles = StyleSheet.create({
         fontWeight: '600',
         fontSize: 16,
     },
-
     gpsButtonContainer: {
         position: 'absolute',
         right: 10,
@@ -1503,14 +1568,13 @@ const styles = StyleSheet.create({
         textAlign: 'left',  // left align text
     },
     filterContainer: {
-        position: 'absolute',
         top: 125, // below the location button
         right: 5,
         flexDirection: 'column',  // column for vertical stack
         backgroundColor: 'rgba(255,255,255,0.9)',
         borderRadius: 25,
         paddingHorizontal: 8,
-        paddingVertical: 8,
+        paddingVertical: 6,
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 1 },
         shadowOpacity: 0.1,
@@ -1519,7 +1583,7 @@ const styles = StyleSheet.create({
     },
 
     filterButton: {
-        marginVertical: 8,
+        marginVertical: 10,
         backgroundColor: '#eee',
         borderRadius: 20,
         padding: 8,

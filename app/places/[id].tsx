@@ -283,32 +283,24 @@ export default function PlaceDetails() {
 
     return (
         <>
-            <ScrollView style={styles.container}>
+            {/* Top-level absolute header buttons */}
+            <View style={{ position: 'absolute', top: 50, left: 0, right: 0, zIndex: 999, flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 20 }} pointerEvents="box-none">
                 <TouchableOpacity
                     onPress={() => { router.back(); }}
-                    style={{
-                        position: 'absolute',
-                        top: -30,
-                        left: 20,
-                        zIndex: 999,
-                    }}
+                    style={{ backgroundColor: 'transparent', borderRadius: 22, padding: 6, shadowColor: '#000', shadowOpacity: 0.08, shadowOffset: { width: 0, height: 2 }, shadowRadius: 4 }}
                 >
                     <AntDesign name="back" size={28} color="#1e3a8a" />
                 </TouchableOpacity>
-
-                {/* ℹ️ Info Button (Top Right) */}
                 <TouchableOpacity
                     onPress={() => setInfoVisible(true)}
-                    style={{
-                        position: 'absolute',
-                        top: -30,
-                        right: 20,
-                        zIndex: 999,
-                    }}
+                    style={{ backgroundColor: 'transparent', borderRadius: 22, padding: 6, shadowColor: '#000', shadowOpacity: 0.08, shadowOffset: { width: 0, height: 2 }, shadowRadius: 4 }}
                 >
                     <Feather name="info" size={26} color="#1e3a8a" />
                 </TouchableOpacity>
+            </View>
 
+            <ScrollView style={styles.container}>
+                {/* ...existing code... */}
                 <View style={styles.infoSection}>
                     <Text
                         style={styles.placeName}
@@ -321,6 +313,12 @@ export default function PlaceDetails() {
                     <Text style={styles.address}>
                         🚶{place.distanceInfo?.walking?.duration} | 🚘 {place.distanceInfo?.driving?.duration}
                         {place.accessibilityOptions?.wheelchairAccessibleRestroom && " | ♿️"}
+                        {['bar', 'pub'].includes((place.primaryType || '').toLowerCase()) && (
+                            <>
+                                {' | '}
+                                <Text style={{ color: '#d90429', fontWeight: 'bold', fontSize: styles.address.fontSize * 1.15 }}>21+</Text>
+                            </>
+                        )}
                     </Text>
                     <Text style={styles.typeText}>{formatType(place.primaryType)}</Text>
 
@@ -405,6 +403,7 @@ export default function PlaceDetails() {
                                     name: place.displayName?.text ?? '',
                                     type: place.primaryType ?? '',
                                     walkingURL: place.googleMapsLinks?.directionsUri,
+                                    walkingTime: place.distanceInfo?.walking?.duration ?? '',
                                 }
                             });
                         }}>

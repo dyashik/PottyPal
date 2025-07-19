@@ -15,7 +15,7 @@ import CustomCallout from '@/components/CustomCallout';
 type LatLng = { latitude: number; longitude: number };
 
 export default function FullscreenMap() {
-    const { lat, lng, name, type, walkingURL } = useLocalSearchParams();
+    const { lat, lng, name, type, walkingURL, walkingTime } = useLocalSearchParams();
     const router = useRouter();
     const mapRef = useRef<MapView>(null);
     const markerRef = useRef<any>(null);
@@ -177,7 +177,6 @@ export default function FullscreenMap() {
                 </TouchableOpacity>
             </View>
 
-
             {/* GPS Button */}
             <View style={{ top: 8, zIndex: 999 }}>
                 <BrandingContainer />
@@ -212,6 +211,17 @@ export default function FullscreenMap() {
                     geodesic
                 />
             </MapView>
+
+            {/* Estimated Walk Time Vertical Pill */}
+            {walkingTime ? (
+                <View style={styles.walkTimePillContainer} pointerEvents="none">
+                    <View style={styles.walkTimePill}>
+                        <FontAwesome5 name="walking" size={20} color="#fff" style={{ marginBottom: 2 }} />
+                        <Text style={styles.walkTimePillTime}>{walkingTime}</Text>
+                        <Text style={styles.walkTimePillLabel}>walk</Text>
+                    </View>
+                </View>
+            ) : null}
 
             {/* Bottom Sheet */}
             <BottomSheet
@@ -256,6 +266,45 @@ export default function FullscreenMap() {
 }
 
 const styles = StyleSheet.create({
+    walkTimePillContainer: {
+        position: 'absolute',
+        bottom: 90, // above the bottom sheet/directions button
+        right: 15,
+        pointerEvents: 'none',
+    },
+    walkTimePill: {
+        backgroundColor: '#1e3a8a',
+        borderRadius: 18,
+        paddingVertical: 10,
+        paddingHorizontal: 12,
+        minWidth: 38,
+        minHeight: 60,
+        alignItems: 'center',
+        justifyContent: 'center',
+        flexDirection: 'column',
+        shadowColor: '#000',
+        shadowOpacity: 0.13,
+        shadowOffset: { width: 0, height: 2 },
+        shadowRadius: 8,
+        elevation: 8,
+        gap: 2,
+    },
+    walkTimePillTime: {
+        color: 'white',
+        fontWeight: '700',
+        fontSize: 13,
+        marginBottom: 0,
+        textAlign: 'center',
+    },
+    walkTimePillLabel: {
+        color: 'white',
+        fontWeight: '600',
+        fontSize: 12,
+        marginTop: -1,
+        textAlign: 'center',
+        letterSpacing: 0.2,
+        opacity: 0.85,
+    },
     brandingContainer: {
         position: 'absolute',
         alignSelf: 'center',
