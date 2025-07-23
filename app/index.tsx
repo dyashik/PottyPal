@@ -55,9 +55,10 @@ export default function App() {
         pit_stop: true, // gas_station and rest_stop
     });
     const [openNowOnly, setOpenNowOnly] = useState(false);
+    const [travelMode, setTravelMode] = useState<'walking' | 'driving'>('walking');
     const insets = useSafeAreaInsets();
     const router = useRouter();
-    const [showNoBathroomsAlert, setShowNoBathroomsAlert] = useState(true);
+    const [showNoBathroomsAlert, setShowNoBathroomsAlert] = useState(false);
     const [sortType, setSortType] = useState<'distance' | 'popularity'>('distance');
     const [isLoading, setIsLoading] = useState(false);
     const [loadingTimeout, setLoadingTimeout] = useState<number | null>(null);
@@ -283,31 +284,17 @@ export default function App() {
     });
 
     useEffect(() => {
-        if (filteredPlaces == null) {
-            return;
-        }
-
-        if (filteredPlaces.length === 0 && !isLoading) {
-            setIsLoading(false);
-            setShowNoBathroomsAlert(true);
-            setTimeout(() => setShowNoBathroomsAlert(false), 2000);
-        }
-
-        if (filteredPlaces.length === 0) {
-            setIsLoading(false);
-            setShowNoBathroomsAlert(true);
-            setTimeout(() => setShowNoBathroomsAlert(false), 2000);
-        }
-
+        // Only hide the alert if places are found or list changes
         if (filteredPlaces != null && filteredPlaces.length > 0) {
             setShowNoBathroomsAlert(false);
             setIsLoading(false);
         }
-        setShowNoBathroomsAlert(false);
     }, [filteredPlaces.length]);
 
-    const snapPoints = useMemo(() => {    // Use immediate timeout to break out of potential batching
-        return selectedPlace ? ['31%'] : ['13%', '50%'];
+    // Always keep bottom sheet visible at 13% when no place is selected, regardless of results
+    const snapPoints = useMemo(() => {
+
+        return selectedPlace ? ['31%'] : ['13%', '55%'];
     }, [selectedPlace]);
 
 
@@ -330,6 +317,7 @@ export default function App() {
                 longitudeDelta: 0.01,
             };
 
+            initialRegionRef.current = userRegion;
             setRegion(userRegion);
             mapRef.current?.animateToRegion(userRegion, 1000);
 
@@ -361,7 +349,6 @@ export default function App() {
                 }, 3000);
 
                 setShowNoBathroomsAlert(false);
-
             }
         })();
 
@@ -648,46 +635,54 @@ export default function App() {
 
 
 
+    const initialRegionRef = useRef<Region | null>(null);
+
     const focusMap = async () => {
-        let location = await Location.getCurrentPositionAsync({});
-        const focusRegion = {
-            latitude: location.coords.latitude,
-            longitude: location.coords.longitude,
-            latitudeDelta: 0.003,
-            longitudeDelta: 0.003,
-        };
-        mapRef.current?.animateToRegion(focusRegion, 1000);
+        if (initialRegionRef.current) {
+            setRegion(initialRegionRef.current);
+            mapRef.current?.animateToRegion(initialRegionRef.current, 1000);
+        } else {
+            let location = await Location.getCurrentPositionAsync({});
+            const focusRegion = {
+                latitude: location.coords.latitude,
+                longitude: location.coords.longitude,
+                latitudeDelta: 0.01,
+                longitudeDelta: 0.01,
+            };
+            initialRegionRef.current = focusRegion;
+            setRegion(focusRegion);
+            mapRef.current?.animateToRegion(focusRegion, 1000);
+        }
     };
 
     // Refresh button handler: zoom to current location, update all walking distances, clear checkedAreasRef
     const handleRefresh = async () => {
-        // Zoom to current location
         await focusMap();
+        // Select all filters
+        setFilters({
+            restaurant: true,
+            cafe: true,
+            grocery_store: true,
+            public_bathroom: true,
+            bar: true,
+            pit_stop: true,
+        });
         // Clear checked areas so user can search again
         checkedAreasRef.current = [];
-        // Update all walking distances in the list
+        // Remove all places from the list
+        setPlaces([]);
+
+        // Fetch places for the focused region
+        let regionToFetch = initialRegionRef.current;
+        if (!regionToFetch) return;
+        const latRad = regionToFetch.latitude * (Math.PI / 180);
+        const metersPerDegreeLongitude = Math.cos(latRad) * (Math.PI / 180) * 6371000;
+        const widthInMeters = regionToFetch.longitudeDelta * metersPerDegreeLongitude;
+        const radius = widthInMeters / 1.75;
         setIsLoading(true);
         try {
-            const userLocation = await Location.getCurrentPositionAsync({});
-            const updated = await Promise.all(
-                places.map(async place => {
-                    try {
-                        const distanceInfo = await fetchWalkingTimeAndDistance(place);
-                        return { ...place, distanceInfo };
-                    } catch (err) {
-                        return place;
-                    }
-                })
-            );
-            setPlaces(updated.filter(
-                (p): p is Place =>
-                    typeof p === 'object' &&
-                    p !== null &&
-                    'distanceInfo' in p &&
-                    typeof p.distanceInfo === 'object' &&
-                    'walking' in p.distanceInfo &&
-                    'driving' in p.distanceInfo
-            ));
+            const results = await fetchNearbyPlaces(regionToFetch.latitude, regionToFetch.longitude, radius);
+            setPlaces(results);
         } finally {
             setIsLoading(false);
         }
@@ -701,8 +696,6 @@ export default function App() {
     };
 
     const lastRequestIdRef = useRef<number>(0);
-
-    const [debugInfo, setDebugInfo] = useState<string>('No debug info yet');
 
     const searchNewBathroom = () => {
         if (!region) {
@@ -773,12 +766,13 @@ export default function App() {
                             const merged = mergeUniquePlaces(oldPlaces, newPlaces);
                             // If no new bathrooms were added, show alert
                             if (merged.length === oldPlaces.length) {
-
                                 setShowNoBathroomsAlert(true);
                                 setTimeout(() => {
                                     setIsLoading(false);
                                     setShowNoBathroomsAlert(false);
                                 }, 2000); // Hide after 2s
+                            } else {
+                                setShowNoBathroomsAlert(false);
                             }
                             return merged;
                         });
@@ -892,6 +886,12 @@ export default function App() {
 
     // Render each place in bottom sheet list
     const renderPlaceItem = ({ item }: { item: Place }) => {
+        const mode = travelMode;
+        const icon = mode === 'walking' ? 'walk' : 'car';
+        // Use purple for driving, orange for walking
+        const color = mode === 'walking' ? '#ff9800' : '#a259e6';
+        const modeLabel = mode === 'walking' ? 'Walk' : 'Drive';
+        const info = item.distanceInfo?.[mode];
 
         return (
             <View style={styles.placeItemContainer}>
@@ -907,11 +907,10 @@ export default function App() {
                         </Text>
                     )}
 
-                    <Text style={styles.distanceInfo}>
-                        {item.distanceInfo?.walking
-                            ? `🚶 ${item.distanceInfo.walking.duration} (${item.distanceInfo.walking.distance})`
-                            : 'Distance unavailable'}
-                    </Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', marginVertical: 1 }}>
+                        <MaterialCommunityIcons name={icon} size={16} color={'grey'} style={{ marginRight: 6 }} />
+                        <Text style={styles.distanceInfo}>{info ? `${info.duration} (${info.distance})` : 'Distance unavailable'}</Text>
+                    </View>
 
                     <Text
                         style={[
@@ -980,18 +979,7 @@ export default function App() {
                 };
             }
 
-            // Check if the new filter selection results in zero bathrooms
-            const categoryPlaces = places.filter(place => {
-                const category = mapToFilterCategory(place.primaryType);
-                if (!category) return false;
-                return newFilters[category] && (!openNowOnly || place.currentOpeningHours?.openNow);
-            });
-
-            if (categoryPlaces.length === 0) {
-                setShowNoBathroomsAlert(true);
-                setTimeout(() => setShowNoBathroomsAlert(false), 2000);
-            }
-
+            // Do NOT show alert when filters result in zero bathrooms
             return newFilters;
         });
     };
@@ -1013,7 +1001,7 @@ export default function App() {
                             onRegionChangeComplete={onRegionChange}
                             customMapStyle={pottyPalMapStyle}
                             ref={mapRef}
-                            key={`map-${filteredPlaces.length}`} // 👈 force re-init
+                            key={`map-${filteredPlaces.length}`}
                             onPress={() => closeDetails()}
                         >
                             {filteredPlaces.map((place, index) => (
@@ -1085,7 +1073,9 @@ export default function App() {
                     </View>
 
                     {/* 🔘 Filter Buttons */}
-                    <ScrollView style={[styles.filterContainer, { position: 'absolute', height: 193, overflow: 'hidden' }]}>
+                    <ScrollView
+                        style={[styles.filterContainer, { position: 'absolute', height: 193, overflow: 'hidden' }]}
+                    >
                         <TouchableOpacity
                             onPress={() => toggleFilter('restaurant')}
                             style={[styles.filterButton, filters.restaurant && styles.filterButtonInActive]}
@@ -1145,16 +1135,53 @@ export default function App() {
                                         else if (activeFilters.length === 1) {
                                             switch (activeFilters[0]) {
                                                 case "restaurant": label = "Restaurant" + (filteredPlaces.length === 1 ? "" : "s"); break;
-                                                case "cafe": label = "Cafe" + (filteredPlaces.length === 1 ? "" : "s"); break;
+                                                case "cafe": label = "Café" + (filteredPlaces.length === 1 ? "" : "s"); break;
                                                 case "grocery_store": label = "Grocery Store" + (filteredPlaces.length === 1 ? "" : "s"); break;
                                                 case "public_bathroom": label = "Public Bathroom" + (filteredPlaces.length === 1 ? "" : "s"); break;
+                                                case "gas_station": label = "Gas Station" + (filteredPlaces.length === 1 ? "" : "s"); break;
+                                                case "bar": label = "Bar" + (filteredPlaces.length === 1 ? "" : "s"); break;
                                                 default: label = "Bathroom" + (filteredPlaces.length === 1 ? "" : "s");
                                             }
                                         }
                                         return (
-                                            <Text style={{ fontSize: 29, paddingVertical: 15, fontWeight: '600', color: '#1e3a8a', textAlign: 'center' }}>
-                                                {filteredPlaces.length} {label} Found
-                                            </Text>
+                                            <>
+                                                <Text style={{ fontSize: 29, paddingVertical: 15, fontWeight: '600', color: '#1e3a8a', textAlign: 'center' }}>
+                                                    {filteredPlaces.length} {label} Found
+                                                </Text>
+                                                <View style={{ flexDirection: 'row', justifyContent: 'center', alignItems: 'center', marginBottom: 8 }}>
+                                                    <TouchableOpacity
+                                                        style={{
+                                                            backgroundColor: travelMode === 'walking' ? '#e0f2fe' : '#f3f4f6',
+                                                            borderRadius: 16,
+                                                            paddingHorizontal: 16,
+                                                            paddingVertical: 7,
+                                                            marginRight: 8,
+                                                            borderWidth: travelMode === 'walking' ? 2 : 1,
+                                                            borderColor: travelMode === 'walking' ? '#1e3a8a' : '#d1d5db',
+                                                            flexDirection: 'row', alignItems: 'center',
+                                                        }}
+                                                        onPress={() => setTravelMode('walking')}
+                                                    >
+                                                        <MaterialCommunityIcons name="walk" size={16} color="#1e3a8a" style={{ marginRight: 4 }} />
+                                                        <Text style={{ color: '#1e3a8a', fontWeight: 'bold', fontSize: 15 }}>Walk</Text>
+                                                    </TouchableOpacity>
+                                                    <TouchableOpacity
+                                                        style={{
+                                                            backgroundColor: travelMode === 'driving' ? '#e0f2fe' : '#f3f4f6',
+                                                            borderRadius: 16,
+                                                            paddingHorizontal: 16,
+                                                            paddingVertical: 7,
+                                                            borderWidth: travelMode === 'driving' ? 2 : 1,
+                                                            borderColor: travelMode === 'driving' ? '#1e3a8a' : '#d1d5db',
+                                                            flexDirection: 'row', alignItems: 'center',
+                                                        }}
+                                                        onPress={() => setTravelMode('driving')}
+                                                    >
+                                                        <MaterialCommunityIcons name="car" size={16} color="#1e3a8a" style={{ marginRight: 4 }} />
+                                                        <Text style={{ color: '#1e3a8a', fontWeight: 'bold', fontSize: 15 }}>Drive</Text>
+                                                    </TouchableOpacity>
+                                                </View>
+                                            </>
                                         );
                                     })()}
                                 </View>
@@ -1193,8 +1220,8 @@ export default function App() {
                                         </Text>
                                     )}
                                     <Text style={styles.detailDistance}>
-                                        🚶 {selectedPlace.distanceInfo?.walking
-                                            ? `${selectedPlace.distanceInfo.walking.duration} (${selectedPlace.distanceInfo.walking.distance})`
+                                        {travelMode === 'walking' ? '🚶' : '🚗'} {selectedPlace.distanceInfo?.[travelMode]
+                                            ? `${selectedPlace.distanceInfo[travelMode].duration} (${selectedPlace.distanceInfo[travelMode].distance})`
                                             : 'Distance unavailable'}
                                     </Text>
 
@@ -1275,7 +1302,9 @@ export default function App() {
                                         keyExtractor={item => item.googleMapsUri || Math.random().toString()}
                                         renderItem={renderPlaceItem}
                                         contentContainerStyle={{ backgroundColor: 'rgba(255, 255, 255, 0.85)' }}
-                                        ListEmptyComponent={() => <Text style={styles.emptyText}>No places found.</Text>}
+                                        ListEmptyComponent={() => (
+                                            <Text style={[styles.emptyText, { fontSize: 26, color: '#dc2626', fontWeight: 'bold', textAlign: 'center', marginTop: 24, paddingBottom: 240 }]}>No places found.</Text>
+                                        )}
                                     />
                                 </>
                             )}
