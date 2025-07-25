@@ -294,7 +294,7 @@ export default function App() {
     // Always keep bottom sheet visible at 13% when no place is selected, regardless of results
     const snapPoints = useMemo(() => {
 
-        return selectedPlace ? ['31%'] : ['13%', '55%'];
+        return selectedPlace ? ['31%'] : ['12%', '55%'];
     }, [selectedPlace]);
 
 
@@ -910,9 +910,22 @@ export default function App() {
                         </Text>
                     )}
 
-                    <View style={{ flexDirection: 'row', alignItems: 'center', marginVertical: 1 }}>
-                        <MaterialCommunityIcons name={icon} size={16} color={'grey'} style={{ marginRight: 6 }} />
-                        <Text style={styles.distanceInfo}>{info ? `${info.duration} (${info.distance})` : 'Distance unavailable'}</Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', marginVertical: 0 }}>
+                        <Text
+                            style={{
+                                fontSize: 18,
+                                marginRight: mode === 'walking' ? 1 : 5,
+                                color: '#1e3a8a',
+                            }}
+                        >
+                            {mode === 'walking' ? '🚶‍♂️' : '🚗'}
+                        </Text>
+                        <Text style={{ fontSize: 15, color: '#1e3a8a' }}>
+                            {info ? info.duration : 'Time unavailable'}
+                        </Text>
+                        <Text style={{ fontSize: 13, color: '#374151', marginLeft: 2 }}>
+                            {info ? `(${info.distance})` : ''}
+                        </Text>
                     </View>
 
                     <Text
@@ -1059,7 +1072,7 @@ export default function App() {
                             {
                                 position: 'absolute',
                                 right: 5,
-                                bottom: 100, // adjust so it sits above BottomSheet
+                                bottom: 95, // adjust so it sits above BottomSheet
                                 top: 'auto',
                                 flexDirection: 'column',
                                 alignItems: 'center',
@@ -1148,7 +1161,7 @@ export default function App() {
                                         }
                                         return (
                                             <>
-                                                <Text style={{ fontSize: 29, paddingVertical: 15, fontWeight: '600', color: '#1e3a8a', textAlign: 'center' }}>
+                                                <Text style={{ fontSize: 29, paddingVertical: 15, marginBottom: 7, fontWeight: '600', color: '#1e3a8a', textAlign: 'center' }}>
                                                     {filteredPlaces.length} {label} Found
                                                 </Text>
                                                 <View style={{ flexDirection: 'row', justifyContent: 'center', alignItems: 'center', marginBottom: 8 }}>
@@ -1161,12 +1174,13 @@ export default function App() {
                                                             marginRight: 8,
                                                             borderWidth: travelMode === 'walking' ? 2 : 1,
                                                             borderColor: travelMode === 'walking' ? '#1e3a8a' : '#d1d5db',
-                                                            flexDirection: 'row', alignItems: 'center',
+                                                            flexDirection: 'row',
+                                                            alignItems: 'center',
                                                         }}
                                                         onPress={() => setTravelMode('walking')}
                                                     >
-                                                        <MaterialCommunityIcons name="walk" size={16} color="#1e3a8a" style={{ marginRight: 4 }} />
-                                                        <Text style={{ color: '#1e3a8a', fontWeight: 'bold', fontSize: 15 }}>Walk</Text>
+                                                        <Text style={{ fontSize: 18, marginRight: 6 }}>🚶‍♂️</Text>
+                                                        <Text style={{ color: '#1e3a8a', fontWeight: 'bold', fontSize: 16 }}>Walk</Text>
                                                     </TouchableOpacity>
                                                     <TouchableOpacity
                                                         style={{
@@ -1176,12 +1190,13 @@ export default function App() {
                                                             paddingVertical: 7,
                                                             borderWidth: travelMode === 'driving' ? 2 : 1,
                                                             borderColor: travelMode === 'driving' ? '#1e3a8a' : '#d1d5db',
-                                                            flexDirection: 'row', alignItems: 'center',
+                                                            flexDirection: 'row',
+                                                            alignItems: 'center',
                                                         }}
                                                         onPress={() => setTravelMode('driving')}
                                                     >
-                                                        <MaterialCommunityIcons name="car" size={16} color="#1e3a8a" style={{ marginRight: 4 }} />
-                                                        <Text style={{ color: '#1e3a8a', fontWeight: 'bold', fontSize: 15 }}>Drive</Text>
+                                                        <Text style={{ fontSize: 18, marginRight: 6 }}>🚘</Text>
+                                                        <Text style={{ color: '#1e3a8a', fontWeight: 'bold', fontSize: 16 }}>Drive</Text>
                                                     </TouchableOpacity>
                                                 </View>
                                             </>
@@ -1222,11 +1237,23 @@ export default function App() {
                                             ⭐ {selectedPlace.rating.toFixed(1)} ({selectedPlace.userRatingCount ?? 0} reviews)
                                         </Text>
                                     )}
-                                    <Text style={styles.detailDistance}>
-                                        {travelMode === 'walking' ? '🚶' : '🚗'} {selectedPlace.distanceInfo?.[travelMode]
-                                            ? `${selectedPlace.distanceInfo[travelMode].duration} (${selectedPlace.distanceInfo[travelMode].distance})`
-                                            : 'Distance unavailable'}
-                                    </Text>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', marginVertical: 1, marginBottom: 10 }}>
+                                        <Text
+                                            style={{
+                                                fontSize: 18,
+                                                marginRight: travelMode === 'walking' ? 1 : 5,
+                                                color: '#1e3a8a',
+                                            }}
+                                        >
+                                            {travelMode === 'walking' ? '🚶‍♂️' : '🚗'}
+                                        </Text>
+                                        <Text style={{ fontSize: 17, color: '#1e3a8a' }}>
+                                            {selectedPlace.distanceInfo?.[travelMode]?.duration || 'Time unavailable'}
+                                        </Text>
+                                        <Text style={{ fontSize: 15, color: '#374151', marginLeft: 4 }}>
+                                            {selectedPlace.distanceInfo?.[travelMode]?.distance ? `(${selectedPlace.distanceInfo[travelMode].distance})` : ''}
+                                        </Text>
+                                    </View>
 
                                     <View style={styles.sideButtonsContainer}>
                                         <TouchableOpacity
@@ -1423,13 +1450,13 @@ const styles = StyleSheet.create({
     },
 
     placeRating: {
-        fontSize: 14,
+        fontSize: 15,
         color: '#555', // neutral gray
         marginBottom: 2,
     },
 
     placeOpenStatus: {
-        fontSize: 13,
+        fontSize: 13.5,
         fontWeight: '500',
         paddingBottom: 5,
     },
