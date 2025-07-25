@@ -859,15 +859,18 @@ export default function App() {
         Linking.openURL(url);
     };
 
-    const openMap = (item: Place) => {
+    const openMap = (item: Place & { travelMode?: string; travelTime?: string; travelDistance?: string }) => {
         router.push({
-            pathname: '/places/fullScreenMap', params: {
+            pathname: '/places/fullScreenMap',
+            params: {
+                id: item.googleMapsUri || Math.random().toString(),
                 lat: item.location.latitude,
                 lng: item.location.longitude,
                 name: item.displayName?.text || 'Unnamed Place',
                 type: item.primaryType || 'Unknown',
                 walkingURL: item.googleMapsLinks?.directionsUri || '',
-                walkingTime: item.distanceInfo?.walking?.duration || '',
+                travelMode: item.travelMode,
+                distanceInfo: JSON.stringify(item.distanceInfo || {}),
             }
         });
         usePlaceStore.getState().setSelectedPlace(item);
@@ -878,7 +881,7 @@ export default function App() {
 
         // Short delay to ensure store is updated before navigating
         setTimeout(() => {
-            router.push({ pathname: '/places/[id]', params: { id } });
+            router.push({ pathname: '/places/[id]', params: { id, travelMode: travelMode } });
         }, 50);
     };
 
@@ -1235,8 +1238,12 @@ export default function App() {
                                         </TouchableOpacity>
                                         <TouchableOpacity
                                             style={[styles.sideButton, styles.goSideButton, { flex: 2 }]}
-                                            onPress={() => openMap(selectedPlace)}
-                                        >
+                                            onPress={() => openMap({
+                                                ...selectedPlace,
+                                                travelMode,
+                                                travelTime: selectedPlace.distanceInfo?.[travelMode]?.duration || '',
+                                                travelDistance: selectedPlace.distanceInfo?.[travelMode]?.distance || ''
+                                            })}>
                                             <FontAwesome5 name="directions" size={27} color="#1e3a8a" />
                                             <Text style={{ fontSize: 11, marginTop: 5, color: "#1e3a8a" }}>
                                                 {selectedPlace.distanceInfo?.walking

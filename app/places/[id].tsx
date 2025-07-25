@@ -22,7 +22,7 @@ function formatType(type?: string) {
 }
 
 export default function PlaceDetails() {
-    const { id } = useLocalSearchParams();
+    const { id, travelMode } = useLocalSearchParams();
     const place = usePlaceStore((state) => state.selectedPlace);
     const [currentLocation, setCurrentLocation] = useState<{ latitude: number; longitude: number } | null>(null);
     const [routeCoords, setRouteCoords] = useState<Array<{ latitude: number; longitude: number }>>([]);
@@ -398,12 +398,15 @@ export default function PlaceDetails() {
                             router.push({
                                 pathname: '/places/fullScreenMap',
                                 params: {
+                                    id: id,
                                     lat: place.location.latitude.toString(),
                                     lng: place.location.longitude.toString(),
                                     name: place.displayName?.text ?? '',
                                     type: place.primaryType ?? '',
                                     walkingURL: place.googleMapsLinks?.directionsUri,
                                     walkingTime: place.distanceInfo?.walking?.duration ?? '',
+                                    travelMode: travelMode,
+                                    distanceInfo: JSON.stringify(place.distanceInfo),
                                 }
                             });
                         }}>

@@ -15,11 +15,17 @@ import CustomCallout from '@/components/CustomCallout';
 type LatLng = { latitude: number; longitude: number };
 
 export default function FullscreenMap() {
-    const { lat, lng, name, type, walkingURL, walkingTime } = useLocalSearchParams();
+    const { id, lat, lng, name, type, walkingURL, travelMode, distanceInfo } = useLocalSearchParams();
+    let parsedDistanceInfo: any = {};
+    try {
+        parsedDistanceInfo = distanceInfo ? JSON.parse(distanceInfo as string) : {};
+    } catch (e) {
+        parsedDistanceInfo = {};
+    }
     const router = useRouter();
     const mapRef = useRef<MapView>(null);
     const markerRef = useRef<any>(null);
-
+    const [mode, setMode] = useState(travelMode === 'driving' ? 'driving' : 'walking'); // default to walking if not driving
     const latNum = parseFloat(lat as string);
     const lngNum = parseFloat(lng as string);
     const insets = useSafeAreaInsets();
@@ -51,12 +57,8 @@ export default function FullscreenMap() {
     ];
 
     const openGoogleMaps = (walkingURL: string) => {
-        let url = walkingURL;
+        let url = mode === 'walking' ? walkingURL.replace(/!3e\d/, '!3e2') : walkingURL;
         if (!url) return;
-
-        // Replace any !3eX with !3e2 for walking
-        url = url.replace(/!3e\d/, '!3e2');
-
         Linking.openURL(url);
     };
 
@@ -212,16 +214,39 @@ export default function FullscreenMap() {
                 />
             </MapView>
 
+            {/* Walk/Drive Toggle - always directly under branding container, styled like search this area button, width smaller than branding */}
+            <View style={{ position: 'absolute', top: 56 + 70, alignSelf: 'center', zIndex: 999, width: '25%' }}>
+                <View style={{ flexDirection: 'row', backgroundColor: '#fff', borderRadius: 22, overflow: 'hidden', borderWidth: 1, borderColor: '#e5e7eb', shadowColor: '#000', shadowOpacity: 0.10, shadowOffset: { width: 0, height: 2 }, shadowRadius: 6, elevation: 6, width: '100%', justifyContent: 'center', alignItems: 'center', minWidth: 110 }}>
+                    <TouchableOpacity
+                        style={{ width: '50%', alignItems: 'center', justifyContent: 'center', paddingVertical: 8, backgroundColor: mode === 'walking' ? '#e0f2fe' : '#fff', borderTopLeftRadius: 22, borderBottomLeftRadius: 22 }}
+                        onPress={() => setMode('walking')}
+                    >
+                        <FontAwesome5 name="walking" size={22} color={mode === 'walking' ? '#1e3a8a' : '#888'} />
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                        style={{ width: '50%', alignItems: 'center', justifyContent: 'center', paddingVertical: 8, backgroundColor: mode === 'driving' ? '#e0f2fe' : '#fff', borderTopRightRadius: 22, borderBottomRightRadius: 22 }}
+                        onPress={() => setMode('driving')}
+                    >
+                        <FontAwesome5 name="car" size={22} color={mode === 'driving' ? '#1e3a8a' : '#888'} />
+                    </TouchableOpacity>
+                </View>
+            </View>
+
             {/* Estimated Walk Time Vertical Pill */}
-            {walkingTime ? (
+            {parsedDistanceInfo[mode]?.duration && (
                 <View style={styles.walkTimePillContainer} pointerEvents="none">
                     <View style={styles.walkTimePill}>
-                        <FontAwesome5 name="walking" size={20} color="#fff" style={{ marginBottom: 2 }} />
-                        <Text style={styles.walkTimePillTime}>{walkingTime}</Text>
-                        <Text style={styles.walkTimePillLabel}>walk</Text>
+                        <FontAwesome5 name={mode === 'walking' ? 'walking' : 'car'} size={20} color="#fff" style={{ marginBottom: 2 }} />
+                        <Text style={styles.walkTimePillTime}>
+                            {parsedDistanceInfo[mode]?.duration}
+                        </Text>
+                        <Text style={styles.walkTimePillLabel}>{mode === 'walking' ? 'walk' : 'drive'}</Text>
+                        {parsedDistanceInfo[mode]?.distance && (
+                            <Text style={[styles.walkTimePillLabel, { fontSize: 11, opacity: 0.7 }]}>{parsedDistanceInfo[mode]?.distance}</Text>
+                        )}
                     </View>
                 </View>
-            ) : null}
+            )}
 
             {/* Bottom Sheet */}
             <BottomSheet
@@ -252,13 +277,24 @@ export default function FullscreenMap() {
                     ListEmptyComponent={() => <Text style={styles.emptyText}>No directions available.</Text>}
                     showsVerticalScrollIndicator={false}
                 />
+                <View style={{ alignItems: 'center', paddingVertical: 100, backgroundColor: 'rgba(255,255,255,0.85)' }}>
+                    <TouchableOpacity
+                        style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#1e3a8a', borderRadius: 999, paddingVertical: 10, paddingHorizontal: 24, marginTop: 8, shadowColor: '#000', shadowOpacity: 0.12, shadowOffset: { width: 0, height: 2 }, shadowRadius: 4, elevation: 4 }}
+                        onPress={() => {
+                            openGoogleMaps(walkingURL as string);
+                        }}
+                    >
+                        <FontAwesome5 name="map-marked-alt" size={20} color="#fff" style={{ marginRight: 10 }} />
+                        <Text style={{ color: '#fff', fontWeight: '700', fontSize: 16 }}>Open in Google Maps</Text>
+                    </TouchableOpacity>
+                </View>
             </BottomSheet>
             <Pressable
                 style={[styles.directionsButtonContainer, { top: insets.top + 10 }]}
-                onPress={() => openGoogleMaps(walkingURL as string)}
+                onPress={() => router.push({ pathname: '/places/[id]', params: { id: 'someId' } })}
             >
                 <View style={styles.directionsButton}>
-                    <FontAwesome5 name="directions" size={24} color="white" />
+                    <FontAwesome5 name="info-circle" size={24} color="white" />
                 </View>
             </Pressable>
         </View >
@@ -443,7 +479,7 @@ const styles = StyleSheet.create({
         backgroundColor: 'rgba(255, 255, 255, 0.85)', // frosted glass-ish
         paddingHorizontal: 20,
         paddingTop: 12,
-        paddingBottom: 24,
+        paddingBottom: 10,
         overflow: 'hidden',
     },
     emptyText: {
