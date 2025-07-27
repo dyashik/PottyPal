@@ -12,13 +12,13 @@ import {
     ScrollView,
 } from 'react-native';
 import { interpolate } from 'react-native-reanimated';
-import Animated, { useAnimatedStyle, useSharedValue } from 'react-native-reanimated';
+import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import { useRouter } from 'expo-router';
 import * as Location from 'expo-location';
 import { FetchNearbyPlacesResponse, Place } from '@/utils/api';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { Entypo, FontAwesome5, FontAwesome6, MaterialIcons } from '@expo/vector-icons';
-import CustomGoogleMarker from './CustomGoogleMarker';
+import CustomGoogleMarker from '../components/CustomGoogleMarker';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import BottomSheet, { BottomSheetFlatList } from '@gorhom/bottom-sheet';
 import { usePlaceStore } from '@/utils/usePlaceStore';
@@ -38,6 +38,8 @@ export default function App() {
     const animatedIndex = useSharedValue(0);
     const checkedAreasRef = useRef<{ latitude: number, longitude: number, radius: number }[]>([]);
     const bottomSheetRef = useRef<BottomSheet>(null);
+
+    const refreshAnim = useSharedValue(0);
     const [region, setRegion] = useState<Region | null>(null);
     const [isRegionChanged, setIsRegionChanged] = useState(false);
     const [places, setPlaces] = useState<Place[]>([]);
@@ -52,7 +54,7 @@ export default function App() {
         grocery_store: true,
         public_bathroom: true,
         bar: true,
-        pit_stop: true, // gas_station and rest_stop
+        pit_stop: true,
     });
     const [openNowOnly, setOpenNowOnly] = useState(false);
     const [travelMode, setTravelMode] = useState<'walking' | 'driving'>('walking');
@@ -70,7 +72,7 @@ export default function App() {
         },
         {
             elementType: 'labels.text.fill',
-            stylers: [{ color: '#1e3a8a' }], // PottyPal blue
+            stylers: [{ color: '#1e3a8a' }],
         },
         {
             elementType: 'labels.text.stroke',
@@ -84,22 +86,22 @@ export default function App() {
         {
             featureType: 'poi',
             elementType: 'labels',
-            stylers: [{ visibility: 'on' }], // Hide all POI labels
+            stylers: [{ visibility: 'on' }],
         },
         {
             featureType: 'poi.park',
             elementType: 'geometry',
-            stylers: [{ color: '#ecfdf5' }], // soft green for parks
+            stylers: [{ color: '#ecfdf5' }],
         },
         {
             featureType: 'road',
             elementType: 'geometry',
-            stylers: [{ color: '#e5e7eb' }], // light gray roads
+            stylers: [{ color: '#e5e7eb' }],
         },
         {
             featureType: 'road',
             elementType: 'labels.text.fill',
-            stylers: [{ color: '#6b7280' }], // medium gray labels
+            stylers: [{ color: '#6b7280' }],
         },
         {
             featureType: 'road.highway',
@@ -118,12 +120,12 @@ export default function App() {
         {
             featureType: 'water',
             elementType: 'geometry',
-            stylers: [{ color: '#cceeff' }], // light blue water
+            stylers: [{ color: '#cceeff' }],
         },
         {
             featureType: 'water',
             elementType: 'labels.text.fill',
-            stylers: [{ color: '#60a5fa' }], // blue water labels
+            stylers: [{ color: '#60a5fa' }],
         },
     ];
 
@@ -134,8 +136,8 @@ export default function App() {
             sub = await Location.watchPositionAsync(
                 {
                     accuracy: Location.Accuracy.Highest,
-                    distanceInterval: 20, // in meters
-                    timeInterval: 5000,   // optional: every 5 sec
+                    distanceInterval: 20,
+                    timeInterval: 5000,
                 },
                 (loc) => {
                     maybeUpdateDistances(loc.coords);
@@ -161,14 +163,14 @@ export default function App() {
         const { latitude: prevLat, longitude: prevLng } = lastKnownUserCoordsRef.current;
         const { latitude, longitude } = newCoords;
 
-        const R = 6371000; // Earth radius in meters
+        const R = 6371000;
         const dLat = (latitude - prevLat) * Math.PI / 180;
         const dLng = (longitude - prevLng) * Math.PI / 180;
         const a = Math.sin(dLat / 2) ** 2 + Math.cos(prevLat * Math.PI / 180) * Math.cos(latitude * Math.PI / 180) * Math.sin(dLng / 2) ** 2;
         const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
         const distanceMoved = R * c;
 
-        if (distanceMoved > 160) { // Only if user moves more than 50 meters
+        if (distanceMoved > 160) {
             lastKnownUserCoordsRef.current = newCoords;
 
             const updated = await Promise.all(
@@ -202,16 +204,12 @@ export default function App() {
     function mapToFilterCategory(type: string | undefined): 'restaurant' | 'cafe' | 'grocery_store' | 'public_bathroom' | 'bar' | 'pit_stop' | null {
         if (!type) return null;
 
-        // Lowercase just in case
         const filter = type.toLowerCase();
 
-        // Grocery-related
         const groceryTypes = ['grocery_store', 'supermarket', 'market', 'convenience_store', 'liquor_store'];
 
-        // Cafe-related
         const cafeTypes = ['cafe', 'coffee_shop', 'cat_cafe', 'dog_cafe', 'tea_house', 'bagel_shop', 'juice_shop', 'candy_store', 'chocolate_shop', 'dessert_shop', 'juice_shop', 'bakery', 'ice_cream_shop'];
 
-        // Restaurant-related catch-all: ends with _restaurant OR specific meal places or food courts
         const restaurantConditions =
             filter.endsWith('_restaurant') ||
             filter.endsWith('dessert_restaurant') ||
@@ -284,14 +282,12 @@ export default function App() {
     });
 
     useEffect(() => {
-        // Only hide the alert if places are found or list changes
         if (filteredPlaces != null && filteredPlaces.length > 0) {
             setShowNoBathroomsAlert(false);
             setIsLoading(false);
         }
     }, [filteredPlaces.length]);
 
-    // Always keep bottom sheet visible at 13% when no place is selected, regardless of results
     const snapPoints = useMemo(() => {
 
         return selectedPlace ? ['31%'] : ['12.5%', '55%'];
@@ -336,7 +332,7 @@ export default function App() {
                     latitude: place.location.latitude,
                     longitude: place.location.longitude,
                 }));
-                coordinates.push({ latitude, longitude }); // include user
+                coordinates.push({ latitude, longitude });
                 mapRef.current.fitToCoordinates(coordinates, {
                     edgePadding: { top: 100, right: 100, bottom: 100, left: 100 },
                     animated: true,
@@ -353,7 +349,6 @@ export default function App() {
         })();
 
         return () => {
-            // Proper cleanup
             if (initialRegionTimeoutRef.current) clearTimeout(initialRegionTimeoutRef.current);
             if (debounceRef.current) clearTimeout(debounceRef.current);
             if (loadingTimeout) clearTimeout(loadingTimeout);
@@ -486,7 +481,6 @@ export default function App() {
             setIsLoading(false);
             if (loadingTimeout) clearTimeout(loadingTimeout);
             setLoadingTimeout(null);
-            console.log("Loading stopped after 2 seconds timeout");
         }, 2000);
         setMaxLoadingTimeout(maxTimer);
 
@@ -652,11 +646,19 @@ export default function App() {
             initialRegionRef.current = focusRegion;
             setRegion(focusRegion);
             mapRef.current?.animateToRegion(focusRegion, 1000);
+            setIsLoading(false);
         }
     };
 
     // Refresh button handler: zoom to current location, update all walking distances, clear checkedAreasRef
     const handleRefresh = async () => {
+        // Animate refresh icon
+        refreshAnim.value = 0;
+        // Animate refreshAnim from 0 to 1
+        refreshAnim.value = withTiming(1, { duration: 700 }, () => {
+            refreshAnim.value = 0; // Reset after animation
+        });
+
         await focusMap();
         // Select all filters
         setFilters({
@@ -731,7 +733,6 @@ export default function App() {
                     setIsLoading(false);
                     if (loadingTimeout) clearTimeout(loadingTimeout);
                     setLoadingTimeout(null);
-                    console.log("Loading stopped after 2 seconds timeout in searchNewBathroom");
                 }, 2000);
                 setMaxLoadingTimeout(maxTimer);
 
@@ -1010,7 +1011,7 @@ export default function App() {
         };
     });
 
-
+    // change zindex of filter button/search this area button
     return (
         <PortalProvider>
             <GestureHandlerRootView style={{ flex: 1 }}>
@@ -1062,7 +1063,7 @@ export default function App() {
                             flexDirection: 'row',
                             justifyContent: 'center',
                             alignItems: 'center',
-                            zIndex: 10,
+                            zIndex: 0,
                             paddingHorizontal: 3,
                         }}
                     >
@@ -1260,7 +1261,7 @@ export default function App() {
                             key="search-area"
                             style={[
                                 styles.searchThisAreaContainer,
-                                { top: insets.top + 130, position: 'absolute', alignSelf: 'center', zIndex: 20 }
+                                { top: insets.top + 130, position: 'absolute', alignSelf: 'center', zIndex: 0 }
                             ]}
                         >
                             <TouchableOpacity
@@ -1290,10 +1291,55 @@ export default function App() {
                             }
                         ]}
                     >
-                        <TouchableOpacity onPress={handleRefresh} style={[styles.filterButton, styles.filterButtonInActive, { marginBottom: 5 }]}>
-                            <MaterialCommunityIcons name="refresh" size={24} color="white" />
+                        <TouchableOpacity
+                            onPress={handleRefresh}
+                            style={[
+                                styles.filterPill,
+                                styles.filterPillUnselected,
+                                {
+                                    marginBottom: 2,
+                                    flexDirection: 'row',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    width: 40,
+                                    height: 40,
+                                    borderRadius: 24,
+                                    paddingHorizontal: 0,
+                                    paddingVertical: 0,
+                                    borderWidth: 2, // Thicker border
+                                    borderColor: '#1e3a8a',
+                                },
+                            ]}
+                        >
+                            <Animated.View
+                                style={useAnimatedStyle(() => ({
+                                    transform: [{
+                                        rotate: `${refreshAnim.value * 360}deg`
+                                    }]
+                                }))}
+                            >
+                                <MaterialCommunityIcons name="refresh" size={24} color="#1e3a8a" />
+                            </Animated.View>
                         </TouchableOpacity>
-                        <TouchableOpacity onPress={focusMap} style={[styles.filterButton, styles.filterButtonInActive]}>
+                        <TouchableOpacity
+                            onPress={focusMap}
+                            style={[
+                                styles.filterButton,
+                                styles.filterButtonInActive,
+                                {
+                                    flexDirection: 'row',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    width: 40,
+                                    height: 40,
+                                    borderRadius: 24,
+                                    paddingHorizontal: 0,
+                                    paddingVertical: 0,
+                                    borderWidth: 2, // Thicker border
+                                    borderColor: '#1e3a8a',
+                                },
+                            ]}
+                        >
                             <MaterialCommunityIcons name="crosshairs-gps" size={24} color="white" />
                         </TouchableOpacity>
                     </View>
@@ -1399,7 +1445,7 @@ export default function App() {
                                                             backgroundColor: travelMode === 'driving' ? '#e0f2fe' : '#f3f4f6',
                                                             borderRadius: 16,
                                                             paddingHorizontal: 13,
-                                                            paddingVertical: 7,
+                                                            paddingVertical: 6,
                                                             borderWidth: 1,
                                                             borderColor: travelMode === 'driving' ? '#1e3a8a' : '#d1d5db',
                                                             flexDirection: 'row',
@@ -1407,7 +1453,7 @@ export default function App() {
                                                         }}
                                                         onPress={() => setTravelMode('driving')}
                                                     >
-                                                        <MaterialIcons name="drive-eta" size={19} style={{ marginRight: 6 }} color={travelMode === 'driving' ? '#1e3a8a' : '#374151'} />
+                                                        <FontAwesome5 name="car" size={18} style={{ marginRight: 7, marginBottom: 1 }} color={travelMode === 'driving' ? '#1e3a8a' : '#374151'} />
                                                         {/* <Text style={{ fontSize: 18, marginRight: 6 }}>🚘</Text> */}
                                                         <Text style={{ color: '#1e3a8a', fontWeight: 'bold', fontSize: 16 }}>Drive</Text>
                                                     </TouchableOpacity>

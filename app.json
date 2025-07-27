@@ -2,7 +2,7 @@
   "expo": {
     "name": "PottyPal",
     "slug": "PottyPal",
-    "version": "1.5.0",
+    "version": "1.7.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "pottypal",
@@ -16,7 +16,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.pottypal.PottyPal",
-      "buildNumber": "6",
+      "buildNumber": "8",
       "config": {
         "googleMapsApiKey": "AIzaSyA924VxnZfLnvUcqN2R9kzFqNjCRTeaIAI"
       },
