@@ -2,7 +2,7 @@
   "expo": {
     "name": "PottyPal",
     "slug": "PottyPal",
-    "version": "1.7.0",
+    "version": "1.8.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "pottypal",
@@ -16,7 +16,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.pottypal.PottyPal",
-      "buildNumber": "8",
+      "buildNumber": "9",
       "config": {
         "googleMapsApiKey": "AIzaSyA924VxnZfLnvUcqN2R9kzFqNjCRTeaIAI"
       },
@@ -58,9 +58,9 @@
       "typedRoutes": true
     },
     "extra": {
-      "googleMapsApiKeyIOS": "AIzaSyA924VxnZfLnvUcqN2R9kzFqNjCRTeaIAI",
-      "googleMapsApiKeyAndroid": "AIzaSyCfdFzoFg28aEjoCPOcrI61FsQJZSS-VLQ",
-      "googleMapsApiKeyWeb": "AIzaSyBYbp_uVFyXPIUIYYZWi9c3eNqYh8myitg",
+      "googleMapsApiKeyIOS": "AIzaSyBkgsPoLYnhO8AEqwaIyM5VjiSWqzMQegk",
+      "googleMapsApiKeyAndroid": "AIzaSyDrj7ENL-kpjzVb3NVKAuF7u7vGQfBKlEo",
+      "googleMapsApiKeyWeb": "AIzaSyARkcLeB-vsltYlhfuxHmFEsP5_MrBrm3I",
       "router": {},
       "eas": {
         "projectId": "e66c1939-9234-4a73-869b-3985c59e312c"

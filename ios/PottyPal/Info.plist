@@ -19,7 +19,7 @@
     <key>CFBundlePackageType</key>
     <string>$(PRODUCT_BUNDLE_PACKAGE_TYPE)</string>
     <key>CFBundleShortVersionString</key>
-    <string>1.6.0</string>
+    <string>1.8.0</string>
     <key>CFBundleSignature</key>
     <string>????</string>
     <key>CFBundleURLTypes</key>
@@ -33,7 +33,7 @@
       </dict>
     </array>
     <key>CFBundleVersion</key>
-    <string>7</string>
+    <string>9</string>
     <key>GADApplicationIdentifier</key>
     <string>ca-app-pub-3844546379677181~2775797959</string>
     <key>GADDelayAppMeasurementInit</key>
