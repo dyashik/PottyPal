@@ -1,50 +1,57 @@
-import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, LayoutChangeEvent } from 'react-native';
 import { Callout } from 'react-native-maps';
 
-import { Place } from '../utils/api'; // Adjust the import path as necessary    
+import { Place } from '../utils/api';
 
 type CustomCalloutProps = {
     place: Place;
 };
 
-function formatType(primaryType: string | undefined): React.ReactNode {
-    if (!primaryType) return null;
-    // Convert snake_case or underscore to Title Case
-    const formatted = primaryType
+function formatType(primaryType: string | undefined): string {
+    if (!primaryType) return '';
+    return primaryType
         .replace(/_/g, ' ')
         .replace(/\b\w/g, char => char.toUpperCase());
-    return formatted;
 }
 
-const CustomCallout: React.FC<CustomCalloutProps> = ({ place }) => (
-    <Callout tooltip alphaHitTest={false}>
-        <View style={styles.calloutContainer}>
-            <Text style={styles.title} numberOfLines={1}>
-                {place.displayName?.text ?? 'Place'}
-            </Text>
+const MIN_WIDTH = 120;
 
-            <Text style={styles.address} numberOfLines={1}>
-                {formatType(place.primaryType)}
-            </Text>
-            {/* 
-            {place.rating && (
-                <Text style={[styles.placeRating, { marginTop: 6 }]}>
-                    ⭐ {place.rating.toFixed(1)}
+const CustomCallout: React.FC<CustomCalloutProps> = ({ place }) => {
+    const [maxWidth, setMaxWidth] = useState<number>(MIN_WIDTH);
+
+    const handleLayout = (e: LayoutChangeEvent) => {
+        const { width } = e.nativeEvent.layout;
+        if (width > maxWidth) {
+            setMaxWidth(width);
+        }
+    };
+
+    const displayName = place.displayName?.text ?? 'Place';
+    const primaryType = formatType(place.primaryType);
+
+    return (
+        <Callout tooltip>
+            <View style={[styles.calloutContainer, { width: Math.max(maxWidth + 30, MIN_WIDTH) }]}>
+                <Text
+                    style={styles.title}
+                    onLayout={handleLayout}
+                    numberOfLines={1}
+                >
+                    {displayName}
                 </Text>
-            )} 
-            */}
-        </View>
-    </Callout>
-);
+                <Text
+                    style={styles.address}
+                    onLayout={handleLayout}
+                >
+                    {primaryType}
+                </Text>
+            </View>
+        </Callout>
+    );
+};
 
-// Paste your provided styles object here
 const styles = StyleSheet.create({
-    placeRating: {
-        fontSize: 14,
-        color: '#555',
-        marginBottom: 2,
-    },
     calloutContainer: {
         backgroundColor: 'rgba(255,255,255,0.99)',
         borderRadius: 10,
@@ -55,7 +62,7 @@ const styles = StyleSheet.create({
         shadowOpacity: 0.3,
         shadowRadius: 4,
         elevation: 5,
-        alignItems: 'center',
+        alignItems: 'center', // 👈 centers children horizontally
         overflow: 'hidden',
         borderWidth: 1,
         borderColor: '#1e3a8a',
@@ -65,13 +72,13 @@ const styles = StyleSheet.create({
         fontSize: 16,
         color: '#1e3a8a',
         marginBottom: 4,
-        textAlign: 'left',
+        textAlign: 'center', // 👈 centers the text
     },
     address: {
         fontSize: 13,
         color: '#555',
-        textAlign: 'left',
-    }
+        textAlign: 'center', // 👈 centers the text
+    },
 });
 
 export default CustomCallout;

@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState, useMemo, useCallback } from 'react';
-import MapView, { Callout, Marker, PROVIDER_GOOGLE, Region } from 'react-native-maps';
+import MapView, { Marker, PROVIDER_GOOGLE, Region } from 'react-native-maps';
 import {
     StyleSheet,
     TouchableOpacity,
@@ -7,27 +7,25 @@ import {
     Text,
     Linking,
     Dimensions,
-    useColorScheme,
-    Platform,
     InteractionManager,
     Modal,
     ScrollView,
 } from 'react-native';
-import Animated, { FadeIn } from 'react-native-reanimated';
+import { interpolate } from 'react-native-reanimated';
+import Animated, { useAnimatedStyle, useSharedValue } from 'react-native-reanimated';
 import { useRouter } from 'expo-router';
 import * as Location from 'expo-location';
-import { DUMMY_PLACE, FetchNearbyPlacesResponse, Place } from '@/utils/api';
+import { FetchNearbyPlacesResponse, Place } from '@/utils/api';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
-import { Entypo, FontAwesome5, FontAwesome6 } from '@expo/vector-icons';
+import { Entypo, FontAwesome5, FontAwesome6, MaterialIcons } from '@expo/vector-icons';
+import CustomGoogleMarker from './CustomGoogleMarker';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import BottomSheet, { BottomSheetFlatList } from '@gorhom/bottom-sheet';
 import { usePlaceStore } from '@/utils/usePlaceStore';
-import { Picker } from '@react-native-picker/picker';
 import SortDropdown from '@/components/SortDropDown';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import getGoogleMapsKey from '@/config/getGoogleMapsKey';
-import { Portal, PortalProvider } from '@gorhom/portal';
-import { Image } from 'expo-image';
+import { PortalProvider } from '@gorhom/portal';
 import BrandingContainer from '@/components/BrandingContainer';
 import CustomCallout from '@/components/CustomCallout';
 import LoadingIndicator from '@/components/LoadingIndicator';
@@ -37,6 +35,7 @@ const { width } = Dimensions.get('window');
 
 export default function App() {
     const mapRef = useRef<MapView>(null);
+    const animatedIndex = useSharedValue(0);
     const checkedAreasRef = useRef<{ latitude: number, longitude: number, radius: number }[]>([]);
     const bottomSheetRef = useRef<BottomSheet>(null);
     const [region, setRegion] = useState<Region | null>(null);
@@ -46,7 +45,8 @@ export default function App() {
     const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const lastFetchedRef = useRef<{ center: { latitude: number; longitude: number }; radius: number } | null>(null);
     const initialRegionTimeoutRef = useRef<number | NodeJS.Timeout | null>(null);
-    const ignoreRegionChangeRef = useRef(true); const [filters, setFilters] = useState({
+    const ignoreRegionChangeRef = useRef(true);
+    const [filters, setFilters] = useState({
         restaurant: true,
         cafe: true,
         grocery_store: true,
@@ -294,7 +294,7 @@ export default function App() {
     // Always keep bottom sheet visible at 13% when no place is selected, regardless of results
     const snapPoints = useMemo(() => {
 
-        return selectedPlace ? ['31%'] : ['12%', '55%'];
+        return selectedPlace ? ['31%'] : ['12.5%', '55%'];
     }, [selectedPlace]);
 
 
@@ -1000,7 +1000,15 @@ export default function App() {
         });
     };
 
-
+    const animatedStyle = useAnimatedStyle(() => {
+        // animatedIndex: 0 = collapsed, 1 = expanded (adjust based on your snapPoints)
+        const opacity = interpolate(animatedIndex.value, [0, 1], [0, 1]);
+        const translateY = interpolate(animatedIndex.value, [0, 1], [40, 0]);
+        return {
+            opacity,
+            transform: [{ translateY }],
+        };
+    });
 
 
     return (
@@ -1033,9 +1041,9 @@ export default function App() {
                                     tracksViewChanges={false}
                                     calloutAnchor={{ x: 0.5, y: -0.2 }}
                                 >
-                                    <CustomCallout
-                                        place={place}
-                                    />
+                                    {/* Custom Google-style marker with icon */}
+                                    <CustomGoogleMarker primaryType={mapToFilterCategory(place.primaryType) || 'restaurant'} />
+                                    <CustomCallout place={place} />
                                 </Marker>
                             ))}
                         </MapView>
@@ -1044,13 +1052,215 @@ export default function App() {
                     <BrandingContainer />
 
 
+                    {/* 🔘 Frosted Glass Pill Filter Chips */}
+                    <View
+                        style={{
+                            position: 'absolute',
+                            top: 65 + insets.top, // just under BrandingContainer
+                            left: 0,
+                            right: 0,
+                            flexDirection: 'row',
+                            justifyContent: 'center',
+                            alignItems: 'center',
+                            zIndex: 10,
+                            paddingHorizontal: 3,
+                        }}
+                    >
+                        <ScrollView
+                            horizontal
+                            showsHorizontalScrollIndicator={false}
+                            contentContainerStyle={{ gap: 10, paddingHorizontal: 8 }}
+                        >
+                            {/* Restaurant */}
+                            {(() => {
+                                const filterCount = Object.values(filters).filter(Boolean).length;
+                                const allTrue = filterCount === 6 && Object.values(filters).every(Boolean);
+                                const onlyOneTrue = filterCount === 1;
+                                const getPillStyle = (active: boolean) => {
+                                    if (allTrue) return styles.filterPillUnselected;
+                                    if (onlyOneTrue && active) return styles.filterPillSelected;
+                                    return styles.filterPillUnselected;
+                                };
+                                const getIconColor = (active: boolean) => {
+                                    if (allTrue) return '#1e3a8a';
+                                    if (onlyOneTrue && active) return '#fff';
+                                    return '#1e3a8a';
+                                };
+                                const getTextColor = getIconColor;
+                                return (
+                                    <TouchableOpacity
+                                        onPress={() => toggleFilter('restaurant')}
+                                        style={[
+                                            styles.filterPill,
+                                            getPillStyle(filters.restaurant),
+                                            null
+                                        ]}
+                                    >
+                                        <MaterialCommunityIcons name="silverware-fork-knife" size={20} color={getIconColor(filters.restaurant)} style={{ marginRight: 7 }} />
+                                        <Text style={{ color: getTextColor(filters.restaurant), fontWeight: '600', fontSize: 15 }}>Restaurant</Text>
+                                    </TouchableOpacity>
+                                );
+                            })()}
+                            {/* Cafe */}
+                            {(() => {
+                                const filterCount = Object.values(filters).filter(Boolean).length;
+                                const allTrue = filterCount === 6 && Object.values(filters).every(Boolean);
+                                const onlyOneTrue = filterCount === 1;
+                                const getPillStyle = (active: boolean) => {
+                                    if (allTrue) return styles.filterPillUnselected;
+                                    if (onlyOneTrue && active) return styles.filterPillSelected;
+                                    return styles.filterPillUnselected;
+                                };
+                                const getIconColor = (active: boolean) => {
+                                    if (allTrue) return '#1e3a8a';
+                                    if (onlyOneTrue && active) return '#fff';
+                                    return '#1e3a8a';
+                                };
+                                const getTextColor = getIconColor;
+                                return (
+                                    <TouchableOpacity
+                                        onPress={() => toggleFilter('cafe')}
+                                        style={[
+                                            styles.filterPill,
+                                            getPillStyle(filters.cafe),
+                                            null
+                                        ]}
+                                    >
+                                        <MaterialCommunityIcons name="coffee" size={20} color={getIconColor(filters.cafe)} style={{ marginRight: 7 }} />
+                                        <Text style={{ color: getTextColor(filters.cafe), fontWeight: '600', fontSize: 15 }}>Café</Text>
+                                    </TouchableOpacity>
+                                );
+                            })()}
+                            {/* Grocery Store */}
+                            {(() => {
+                                const filterCount = Object.values(filters).filter(Boolean).length;
+                                const allTrue = filterCount === 6 && Object.values(filters).every(Boolean);
+                                const onlyOneTrue = filterCount === 1;
+                                const getPillStyle = (active: boolean) => {
+                                    if (allTrue) return styles.filterPillUnselected;
+                                    if (onlyOneTrue && active) return styles.filterPillSelected;
+                                    return styles.filterPillUnselected;
+                                };
+                                const getIconColor = (active: boolean) => {
+                                    if (allTrue) return '#1e3a8a';
+                                    if (onlyOneTrue && active) return '#fff';
+                                    return '#1e3a8a';
+                                };
+                                const getTextColor = getIconColor;
+                                return (
+                                    <TouchableOpacity
+                                        onPress={() => toggleFilter('grocery_store')}
+                                        style={[
+                                            styles.filterPill,
+                                            getPillStyle(filters.grocery_store),
+                                            null
+                                        ]}
+                                    >
+                                        <MaterialCommunityIcons name="cart" size={20} color={getIconColor(filters.grocery_store)} style={{ marginRight: 7 }} />
+                                        <Text style={{ color: getTextColor(filters.grocery_store), fontWeight: '600', fontSize: 15 }}>Grocery</Text>
+                                    </TouchableOpacity>
+                                );
+                            })()}
+                            {/* Public Bathroom */}
+                            {(() => {
+                                const filterCount = Object.values(filters).filter(Boolean).length;
+                                const allTrue = filterCount === 6 && Object.values(filters).every(Boolean);
+                                const onlyOneTrue = filterCount === 1;
+                                const getPillStyle = (active: boolean) => {
+                                    if (allTrue) return styles.filterPillUnselected;
+                                    if (onlyOneTrue && active) return styles.filterPillSelected;
+                                    return styles.filterPillUnselected;
+                                };
+                                const getIconColor = (active: boolean) => {
+                                    if (allTrue) return '#1e3a8a';
+                                    if (onlyOneTrue && active) return '#fff';
+                                    return '#1e3a8a';
+                                };
+                                const getTextColor = getIconColor;
+                                return (
+                                    <TouchableOpacity
+                                        onPress={() => toggleFilter('public_bathroom')}
+                                        style={[
+                                            styles.filterPill,
+                                            getPillStyle(filters.public_bathroom),
+                                            null
+                                        ]}
+                                    >
+                                        <FontAwesome5 name="toilet" size={20} color={getIconColor(filters.public_bathroom)} style={{ marginRight: 7 }} />
+                                        <Text style={{ color: getTextColor(filters.public_bathroom), fontWeight: '600', fontSize: 15 }}>Public Bathroom</Text>
+                                    </TouchableOpacity>
+                                );
+                            })()}
+                            {/* Pit Stop */}
+                            {(() => {
+                                const filterCount = Object.values(filters).filter(Boolean).length;
+                                const allTrue = filterCount === 6 && Object.values(filters).every(Boolean);
+                                const onlyOneTrue = filterCount === 1;
+                                const getPillStyle = (active: boolean) => {
+                                    if (allTrue) return styles.filterPillUnselected;
+                                    if (onlyOneTrue && active) return styles.filterPillSelected;
+                                    return styles.filterPillUnselected;
+                                };
+                                const getIconColor = (active: boolean) => {
+                                    if (allTrue) return '#1e3a8a';
+                                    if (onlyOneTrue && active) return '#fff';
+                                    return '#1e3a8a';
+                                };
+                                const getTextColor = getIconColor;
+                                return (
+                                    <TouchableOpacity
+                                        onPress={() => toggleFilter('pit_stop')}
+                                        style={[
+                                            styles.filterPill,
+                                            getPillStyle(filters.pit_stop),
+                                            null
+                                        ]}
+                                    >
+                                        <MaterialCommunityIcons name="gas-station" size={20} color={getIconColor(filters.pit_stop)} style={{ marginRight: 7 }} />
+                                        <Text style={{ color: getTextColor(filters.pit_stop), fontWeight: '600', fontSize: 15 }}>Gas Station</Text>
+                                    </TouchableOpacity>
+                                );
+                            })()}
+                            {/* Bar */}
+                            {(() => {
+                                const filterCount = Object.values(filters).filter(Boolean).length;
+                                const allTrue = filterCount === 6 && Object.values(filters).every(Boolean);
+                                const onlyOneTrue = filterCount === 1;
+                                const getPillStyle = (active: boolean) => {
+                                    if (allTrue) return styles.filterPillUnselected;
+                                    if (onlyOneTrue && active) return styles.filterPillSelected;
+                                    return styles.filterPillUnselected;
+                                };
+                                const getIconColor = (active: boolean) => {
+                                    if (allTrue) return '#1e3a8a';
+                                    if (onlyOneTrue && active) return '#fff';
+                                    return '#1e3a8a';
+                                };
+                                const getTextColor = getIconColor;
+                                return (
+                                    <TouchableOpacity
+                                        onPress={() => toggleFilter('bar')}
+                                        style={[
+                                            styles.filterPill,
+                                            getPillStyle(filters.bar),
+                                            null
+                                        ]}
+                                    >
+                                        <Entypo name="drink" size={20} color={getIconColor(filters.bar)} style={{ marginRight: 7 }} />
+                                        <Text style={{ color: getTextColor(filters.bar), fontWeight: '600', fontSize: 15 }}>Bar</Text>
+                                    </TouchableOpacity>
+                                );
+                            })()}
+                        </ScrollView>
+                    </View>
+
                     {/* 🔍 Search This Area - moved OUT of MapView */}
                     {isRegionChanged && (
                         <Animated.View
                             key="search-area"
                             style={[
                                 styles.searchThisAreaContainer,
-                                { top: insets.top + 80, position: 'absolute' }
+                                { top: insets.top + 130, position: 'absolute', alignSelf: 'center', zIndex: 20 }
                             ]}
                         >
                             <TouchableOpacity
@@ -1089,7 +1299,7 @@ export default function App() {
                     </View>
 
                     {/* 🔘 Filter Buttons */}
-                    <ScrollView
+                    {/* <ScrollView
                         style={[styles.filterContainer, { position: 'absolute', height: 193, overflow: 'hidden' }]}
                     >
                         <TouchableOpacity
@@ -1128,7 +1338,7 @@ export default function App() {
                         >
                             <Entypo name="drink" size={24} color={filters.bar ? 'white' : '#333'} />
                         </TouchableOpacity>
-                    </ScrollView>
+                    </ScrollView> */}
 
 
                     <BottomSheet
@@ -1137,6 +1347,7 @@ export default function App() {
                         snapPoints={snapPoints}
                         enablePanDownToClose={true}
                         onClose={closeDetails}
+                        animatedIndex={animatedIndex}
                         style={[styles.bottomSheet]}
                         backgroundComponent={() => <View style={{ backgroundColor: 'transparent' }} />}
                     >
@@ -1161,10 +1372,10 @@ export default function App() {
                                         }
                                         return (
                                             <>
-                                                <Text style={{ fontSize: 29, paddingVertical: 15, marginBottom: 7, fontWeight: '600', color: '#1e3a8a', textAlign: 'center' }}>
+                                                <Text style={{ fontSize: 29, paddingVertical: 15, fontWeight: '600', color: '#1e3a8a', textAlign: 'center' }}>
                                                     {filteredPlaces.length} {label} Found
                                                 </Text>
-                                                <View style={{ flexDirection: 'row', justifyContent: 'center', alignItems: 'center', marginBottom: 8 }}>
+                                                <View style={{ flexDirection: 'row', justifyContent: 'center', alignItems: 'center', paddingVertical: 15 }}>
                                                     <TouchableOpacity
                                                         style={{
                                                             backgroundColor: travelMode === 'walking' ? '#e0f2fe' : '#f3f4f6',
@@ -1172,30 +1383,32 @@ export default function App() {
                                                             paddingHorizontal: 16,
                                                             paddingVertical: 7,
                                                             marginRight: 8,
-                                                            borderWidth: travelMode === 'walking' ? 2 : 1,
+                                                            borderWidth: 1,
                                                             borderColor: travelMode === 'walking' ? '#1e3a8a' : '#d1d5db',
                                                             flexDirection: 'row',
                                                             alignItems: 'center',
                                                         }}
                                                         onPress={() => setTravelMode('walking')}
                                                     >
-                                                        <Text style={{ fontSize: 18, marginRight: 6 }}>🚶‍♂️</Text>
+                                                        <FontAwesome5 name="walking" size={18} style={{ marginRight: 8 }} color={travelMode === 'walking' ? '#1e3a8a' : '#374151'} />
+                                                        {/* <Text style={{ fontSize: 18, marginRight: 6 }}>🚶‍♂️</Text> */}
                                                         <Text style={{ color: '#1e3a8a', fontWeight: 'bold', fontSize: 16 }}>Walk</Text>
                                                     </TouchableOpacity>
                                                     <TouchableOpacity
                                                         style={{
                                                             backgroundColor: travelMode === 'driving' ? '#e0f2fe' : '#f3f4f6',
                                                             borderRadius: 16,
-                                                            paddingHorizontal: 16,
+                                                            paddingHorizontal: 13,
                                                             paddingVertical: 7,
-                                                            borderWidth: travelMode === 'driving' ? 2 : 1,
+                                                            borderWidth: 1,
                                                             borderColor: travelMode === 'driving' ? '#1e3a8a' : '#d1d5db',
                                                             flexDirection: 'row',
                                                             alignItems: 'center',
                                                         }}
                                                         onPress={() => setTravelMode('driving')}
                                                     >
-                                                        <Text style={{ fontSize: 18, marginRight: 6 }}>🚘</Text>
+                                                        <MaterialIcons name="drive-eta" size={19} style={{ marginRight: 6 }} color={travelMode === 'driving' ? '#1e3a8a' : '#374151'} />
+                                                        {/* <Text style={{ fontSize: 18, marginRight: 6 }}>🚘</Text> */}
                                                         <Text style={{ color: '#1e3a8a', fontWeight: 'bold', fontSize: 16 }}>Drive</Text>
                                                     </TouchableOpacity>
                                                 </View>
@@ -1206,7 +1419,7 @@ export default function App() {
                             )}
 
                             {selectedPlace ? (
-                                <View style={styles.detailsContainer}>
+                                <View style={[styles.detailsContainer]}>
                                     <View style={styles.titleRow}>
                                         <Text
                                             numberOfLines={1}
@@ -1644,6 +1857,33 @@ const styles = StyleSheet.create({
         shadowRadius: 3,
         elevation: 5,
     },
+    filterPill: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 16,
+        paddingVertical: 8,
+        borderRadius: 999,
+        marginRight: 2,
+        marginVertical: 8,
+        backgroundColor: '#fff',
+        borderWidth: 2,
+        borderColor: '#1e3a8a',
+        opacity: 1,
+    },
+    filterPillSelected: {
+        backgroundColor: '#1e3a8a',
+        borderWidth: 2,
+        borderColor: '#1e3a8a',
+        opacity: 1,
+    },
+    filterPillUnselected: {
+        backgroundColor: 'rgba(255,255,255,0.9)', // match gps/refresh/filterContainer
+        borderWidth: 1.5,
+        borderColor: 'rgba(30,58,138,0.78)', // subtle blue border
+        opacity: 1,
+    },
+
+
 
     filterButton: {
         marginVertical: 10,
@@ -1664,14 +1904,14 @@ const styles = StyleSheet.create({
     },
     searchThisAreaContainer: {
         position: 'absolute',
-        top: 140, // below your branding and filters
+        top: 160, // below your branding and filters
         alignSelf: 'center',
         backgroundColor: 'transparent',
     },
 
     searchThisAreaButton: {
         backgroundColor: '#1e3a8a',
-        paddingVertical: 10,
+        paddingVertical: 13,
         paddingHorizontal: 20,
         borderRadius: 25,
         elevation: 5,
@@ -1688,3 +1928,4 @@ const styles = StyleSheet.create({
         textAlign: 'center',
     }
 });
+

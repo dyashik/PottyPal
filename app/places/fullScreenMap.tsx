@@ -259,7 +259,7 @@ export default function FullscreenMap() {
             >
                 {/* Directions Header */}
                 <View style={{ backgroundColor: 'rgba(255, 255, 255, 0.85)', paddingHorizontal: 20, paddingBottom: 16 }}>
-                    <Text style={{ fontSize: 29, paddingVertical: 15, fontWeight: '600', color: '#1e3a8a', textAlign: 'center' }}>
+                    <Text style={{ fontSize: 29, paddingVertical: 5, fontWeight: '600', color: '#1e3a8a', textAlign: 'center' }}>
                         Directions
                     </Text>
                 </View>
@@ -277,7 +277,7 @@ export default function FullscreenMap() {
                     ListEmptyComponent={() => <Text style={styles.emptyText}>No directions available.</Text>}
                     showsVerticalScrollIndicator={false}
                 />
-                <View style={{ alignItems: 'center', paddingVertical: 100, backgroundColor: 'rgba(255,255,255,0.85)' }}>
+                <View style={{ alignItems: 'center', paddingVertical: 25, backgroundColor: 'rgba(255,255,255,0.85)' }}>
                     <TouchableOpacity
                         style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#1e3a8a', borderRadius: 999, paddingVertical: 10, paddingHorizontal: 24, marginTop: 8, shadowColor: '#000', shadowOpacity: 0.12, shadowOffset: { width: 0, height: 2 }, shadowRadius: 4, elevation: 4 }}
                         onPress={() => {
