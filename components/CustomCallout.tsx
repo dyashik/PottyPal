@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, LayoutChangeEvent } from 'react-native';
-import { Callout } from 'react-native-maps';
+import MapView, { Callout } from 'react-native-maps';
 
 import { Place } from '../utils/api';
 
@@ -16,6 +16,7 @@ function formatType(primaryType: string | undefined): string {
 }
 
 const MIN_WIDTH = 120;
+const MAX_WIDTH = 400; // Optional: Set a maximum width if needed
 
 const CustomCallout: React.FC<CustomCalloutProps> = ({ place }) => {
     const [maxWidth, setMaxWidth] = useState<number>(MIN_WIDTH);
@@ -31,21 +32,10 @@ const CustomCallout: React.FC<CustomCalloutProps> = ({ place }) => {
     const primaryType = formatType(place.primaryType);
 
     return (
-        <Callout tooltip>
-            <View style={[styles.calloutContainer, { width: Math.max(maxWidth + 30, MIN_WIDTH) }]}>
-                <Text
-                    style={styles.title}
-                    onLayout={handleLayout}
-                    numberOfLines={1}
-                >
-                    {displayName}
-                </Text>
-                <Text
-                    style={styles.address}
-                    onLayout={handleLayout}
-                >
-                    {primaryType}
-                </Text>
+        <Callout tooltip style={{ flex: 1, position: 'relative' }} onLayout={handleLayout}>
+            <View style={styles.calloutContainer}>
+                <Text style={styles.title}>{displayName}</Text>
+                <Text style={styles.address}>{primaryType}</Text>
             </View>
         </Callout>
     );
@@ -56,7 +46,7 @@ const styles = StyleSheet.create({
         backgroundColor: 'rgba(255,255,255,0.99)',
         borderRadius: 10,
         paddingVertical: 10,
-        paddingHorizontal: 15,
+        paddingHorizontal: 20,
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.3,
@@ -72,12 +62,12 @@ const styles = StyleSheet.create({
         fontSize: 16,
         color: '#1e3a8a',
         marginBottom: 4,
-        textAlign: 'center', // 👈 centers the text
+        textAlign: 'center',
     },
     address: {
         fontSize: 13,
         color: '#555',
-        textAlign: 'center', // 👈 centers the text
+        textAlign: 'center',
     },
 });
 

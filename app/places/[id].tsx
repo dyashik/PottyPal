@@ -145,6 +145,7 @@ export default function PlaceDetails() {
         setMode((prev) => (prev === 'walking' ? 'driving' : 'walking'));
     };
 
+
     async function fetchRoute(origin: { latitude: number; longitude: number }, destination: { latitude: number; longitude: number }, mode: 'walking' | 'driving') {
         try {
             const API_KEY = getGoogleMapsApiKey(true);
@@ -268,11 +269,17 @@ export default function PlaceDetails() {
     const openGoogleMaps = (walkingURL: string) => {
         let url = walkingURL;
         if (!url) return;
+        console.log('Mode: ' + travelMode);
+        // Use the mode from state to determine travel mode
+        if (travelMode === 'driving') {
+            // Replace any !3eX with !3e0 for driving
+            url = url.replace(/!3e\d/, '!3e0');
+        } else {
+            // Replace any !3eX with !3e2 for walking
+            url = url.replace(/!3e\d/, '!3e2');
+        }
 
-        // Replace any !3eX with !3e2 for walking
-        url = url.replace(/!3e\d/, '!3e2');
-
-        console.log('Opening Google Maps with walking directions:', url);
+        console.log(`Opening Google Maps with ${travelMode} directions:`, url);
         Linking.openURL(url);
     };
 
@@ -329,7 +336,7 @@ export default function PlaceDetails() {
                     <TouchableOpacity
                         style={styles.actionBtn}
                         onPress={() => {
-                            openGoogleMaps((place.googleMapsLinks?.directionsUri!) + '&travelmode=walking');
+                            openGoogleMaps(place.googleMapsLinks?.directionsUri!);
                         }}
                     >
                         <View style={styles.iconTextRow}>

@@ -28,6 +28,7 @@ import getGoogleMapsKey from '@/config/getGoogleMapsKey';
 import { PortalProvider } from '@gorhom/portal';
 import BrandingContainer from '@/components/BrandingContainer';
 import CustomCallout from '@/components/CustomCallout';
+import TravelModeDropdown from '../components/TravelModeDropdown';
 import LoadingIndicator from '@/components/LoadingIndicator';
 
 
@@ -65,6 +66,7 @@ export default function App() {
     const [isLoading, setIsLoading] = useState(false);
     const [loadingTimeout, setLoadingTimeout] = useState<number | null>(null);
     const [maxLoadingTimeout, setMaxLoadingTimeout] = useState<number | null>(null);
+    const [showTravelDropdown, setShowTravelDropdown] = useState(false);
     const pottyPalMapStyle = [
         {
             elementType: 'geometry',
@@ -882,6 +884,7 @@ export default function App() {
 
         // Short delay to ensure store is updated before navigating
         setTimeout(() => {
+            console.log('Navigating to place details:', id, travelMode);
             router.push({ pathname: '/places/[id]', params: { id, travelMode: travelMode } });
         }, 50);
     };
@@ -896,6 +899,8 @@ export default function App() {
         const color = mode === 'walking' ? '#ff9800' : '#a259e6';
         const modeLabel = mode === 'walking' ? 'Walk' : 'Drive';
         const info = item.distanceInfo?.[mode];
+        // set item mode
+        // item.travelMode = mode; // Removed to avoid type error
 
         return (
             <View style={styles.placeItemContainer}>
@@ -949,7 +954,7 @@ export default function App() {
                     </TouchableOpacity>
                     <TouchableOpacity
                         style={[styles.sideButton, styles.goSideButton]}
-                        onPress={() => openMap(item)}
+                        onPress={() => openMap({ ...item, travelMode: mode })}
                     >
                         <FontAwesome5 name="directions" size={27} color="#1e3a8a" />
                     </TouchableOpacity>
@@ -1411,54 +1416,17 @@ export default function App() {
                                                 case "cafe": label = "Café" + (filteredPlaces.length === 1 ? "" : "s"); break;
                                                 case "grocery_store": label = "Grocery Store" + (filteredPlaces.length === 1 ? "" : "s"); break;
                                                 case "public_bathroom": label = "Public Bathroom" + (filteredPlaces.length === 1 ? "" : "s"); break;
-                                                case "gas_station": label = "Gas Station" + (filteredPlaces.length === 1 ? "" : "s"); break;
+                                                case "pit_stop": label = "Gas Station" + (filteredPlaces.length === 1 ? "" : "s"); break;
                                                 case "bar": label = "Bar" + (filteredPlaces.length === 1 ? "" : "s"); break;
                                                 default: label = "Bathroom" + (filteredPlaces.length === 1 ? "" : "s");
                                             }
                                         }
                                         return (
-                                            <>
+                                            <View>
                                                 <Text style={{ fontSize: 29, paddingVertical: 15, fontWeight: '600', color: '#1e3a8a', textAlign: 'center' }}>
                                                     {filteredPlaces.length} {label} Found
                                                 </Text>
-                                                <View style={{ flexDirection: 'row', justifyContent: 'center', alignItems: 'center', paddingVertical: 15 }}>
-                                                    <TouchableOpacity
-                                                        style={{
-                                                            backgroundColor: travelMode === 'walking' ? '#e0f2fe' : '#f3f4f6',
-                                                            borderRadius: 16,
-                                                            paddingHorizontal: 16,
-                                                            paddingVertical: 7,
-                                                            marginRight: 8,
-                                                            borderWidth: 1,
-                                                            borderColor: travelMode === 'walking' ? '#1e3a8a' : '#d1d5db',
-                                                            flexDirection: 'row',
-                                                            alignItems: 'center',
-                                                        }}
-                                                        onPress={() => setTravelMode('walking')}
-                                                    >
-                                                        <FontAwesome5 name="walking" size={18} style={{ marginRight: 8 }} color={travelMode === 'walking' ? '#1e3a8a' : '#374151'} />
-                                                        {/* <Text style={{ fontSize: 18, marginRight: 6 }}>🚶‍♂️</Text> */}
-                                                        <Text style={{ color: '#1e3a8a', fontWeight: 'bold', fontSize: 16 }}>Walk</Text>
-                                                    </TouchableOpacity>
-                                                    <TouchableOpacity
-                                                        style={{
-                                                            backgroundColor: travelMode === 'driving' ? '#e0f2fe' : '#f3f4f6',
-                                                            borderRadius: 16,
-                                                            paddingHorizontal: 13,
-                                                            paddingVertical: 6,
-                                                            borderWidth: 1,
-                                                            borderColor: travelMode === 'driving' ? '#1e3a8a' : '#d1d5db',
-                                                            flexDirection: 'row',
-                                                            alignItems: 'center',
-                                                        }}
-                                                        onPress={() => setTravelMode('driving')}
-                                                    >
-                                                        <FontAwesome5 name="car" size={18} style={{ marginRight: 7, marginBottom: 1 }} color={travelMode === 'driving' ? '#1e3a8a' : '#374151'} />
-                                                        {/* <Text style={{ fontSize: 18, marginRight: 6 }}>🚘</Text> */}
-                                                        <Text style={{ color: '#1e3a8a', fontWeight: 'bold', fontSize: 16 }}>Drive</Text>
-                                                    </TouchableOpacity>
-                                                </View>
-                                            </>
+                                            </View>
                                         );
                                     })()}
                                 </View>
@@ -1532,8 +1500,8 @@ export default function App() {
                                             })}>
                                             <FontAwesome5 name="directions" size={27} color="#1e3a8a" />
                                             <Text style={{ fontSize: 11, marginTop: 5, color: "#1e3a8a" }}>
-                                                {selectedPlace.distanceInfo?.walking
-                                                    ? `${selectedPlace.distanceInfo.walking.duration}`
+                                                {selectedPlace.distanceInfo?.[travelMode]?.duration
+                                                    ? selectedPlace.distanceInfo[travelMode].duration
                                                     : 'Distance unavailable'}
                                             </Text>
                                         </TouchableOpacity>
@@ -1541,8 +1509,9 @@ export default function App() {
                                 </View>
                             ) : (
                                 <>
-                                    <View style={styles.filterRow}>
-                                        <SortDropdown sortType={sortType} setSortType={setSortType} />
+                                    <View style={[styles.filterRow, { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }]}>
+                                        {/* <SortDropdown sortType={sortType} setSortType={setSortType} /> */}
+                                        <TravelModeDropdown travelMode={travelMode} setTravelMode={setTravelMode} />
                                         <TouchableOpacity
                                             style={[
                                                 styles.openNowBtn,
