@@ -489,9 +489,9 @@ export default function PlaceDetails() {
                         }}
                     >
                         <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16 }}>
-                            <MaterialCommunityIcons
-                                name="toilet"
-                                size={30}
+                            <FontAwesome5
+                                name="toilet-paper"
+                                size={25}
                                 color="#1e3a8a"
                                 style={{ marginRight: 14 }}
                             />

@@ -23,6 +23,7 @@ type SortDropdownProps = {
 const SortDropdown = ({ sortType, setSortType }: SortDropdownProps) => {
     const [modalVisible, setModalVisible] = useState(false);
     const [dropdownPos, setDropdownPos] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
+    const [dropdownWidth, setDropdownWidth] = useState<number>(220);
     const btnRef = useRef<any>(null);
 
     const openDropdown = () => {
@@ -30,6 +31,7 @@ const SortDropdown = ({ sortType, setSortType }: SortDropdownProps) => {
         if (handle) {
             UIManager.measure(handle, (x, y, width, height, pageX, pageY) => {
                 setDropdownPos({ top: pageY + height, left: pageX });
+                setDropdownWidth(width);
                 setModalVisible(true);
             });
         }
@@ -55,7 +57,7 @@ const SortDropdown = ({ sortType, setSortType }: SortDropdownProps) => {
 
             <Modal transparent visible={modalVisible} animationType="fade">
                 <Pressable style={StyleSheet.absoluteFill} onPress={() => setModalVisible(false)}>
-                    <View style={[styles.dropdown, { top: dropdownPos.top, left: dropdownPos.left }]}>
+                    <View style={[styles.dropdown, { top: dropdownPos.top, left: dropdownPos.left, width: dropdownWidth }]}>
                         <Pressable
                             onPress={() => handleSelect('distance')}
                             style={[
@@ -75,7 +77,7 @@ const SortDropdown = ({ sortType, setSortType }: SortDropdownProps) => {
                             ]}
                         >
                             <Text style={sortType === 'popularity' ? styles.selectedText : styles.optionText}>
-                                Popularity (Star Reviews)
+                                Popularity
                             </Text>
                         </Pressable>
                     </View>
@@ -105,7 +107,7 @@ const styles = StyleSheet.create({
     },
     dropdown: {
         position: 'absolute',
-        width: 220,
+        // width is set dynamically
         backgroundColor: '#fff',
         borderRadius: 6,
         shadowColor: '#000',

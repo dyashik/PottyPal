@@ -67,6 +67,10 @@ export default function App() {
     const [loadingTimeout, setLoadingTimeout] = useState<number | null>(null);
     const [maxLoadingTimeout, setMaxLoadingTimeout] = useState<number | null>(null);
     const [showTravelDropdown, setShowTravelDropdown] = useState(false);
+    const themeLightBlue = 'rgba(224, 242, 253, 1)'; // light background
+    const themeDarkBlue = '#1e3a8a'; // strong blue border and text
+
+
     const pottyPalMapStyle = [
         {
             elementType: 'geometry',
@@ -634,26 +638,29 @@ export default function App() {
     const initialRegionRef = useRef<Region | null>(null);
 
     const focusMap = async () => {
-        if (initialRegionRef.current) {
-            setRegion(initialRegionRef.current);
-            mapRef.current?.animateToRegion(initialRegionRef.current, 1000);
-        } else {
-            let location = await Location.getCurrentPositionAsync({});
-            const focusRegion = {
-                latitude: location.coords.latitude,
-                longitude: location.coords.longitude,
-                latitudeDelta: 0.01,
-                longitudeDelta: 0.01,
-            };
-            initialRegionRef.current = focusRegion;
-            setRegion(focusRegion);
-            mapRef.current?.animateToRegion(focusRegion, 1000);
-            setIsLoading(false);
-        }
+        // Immediately hide "Search This Area" button FIRST
+
+        // Always get current location (where blue dot is) instead of using cached initial region
+        let location = await Location.getCurrentPositionAsync({});
+        const focusRegion = {
+            latitude: location.coords.latitude,
+            longitude: location.coords.longitude,
+            latitudeDelta: 0.01,
+            longitudeDelta: 0.01,
+        };
+
+        // Update the initial region reference to the new current location
+        initialRegionRef.current = focusRegion;
+        setRegion(focusRegion);
+        mapRef.current?.animateToRegion(focusRegion, 1000);
+        setIsLoading(false);
     };
 
     // Refresh button handler: zoom to current location, update all walking distances, clear checkedAreasRef
     const handleRefresh = async () => {
+        // Immediately hide "Search This Area" button FIRST
+        setIsRegionChanged(false);
+
         // Animate refresh icon
         refreshAnim.value = 0;
         // Animate refreshAnim from 0 to 1
@@ -689,6 +696,15 @@ export default function App() {
             setPlaces(results);
         } finally {
             setIsLoading(false);
+            setIsRegionChanged(false);
+            ignoreRegionChangeRef.current = true;
+            setRegion(regionToFetch);
+
+            // Re-enable region change detection after a delay
+            if (initialRegionTimeoutRef.current) clearTimeout(initialRegionTimeoutRef.current);
+            initialRegionTimeoutRef.current = setTimeout(() => {
+                ignoreRegionChangeRef.current = false;
+            }, 2000);
         }
     };
 
@@ -884,7 +900,6 @@ export default function App() {
 
         // Short delay to ensure store is updated before navigating
         setTimeout(() => {
-            console.log('Navigating to place details:', id, travelMode);
             router.push({ pathname: '/places/[id]', params: { id, travelMode: travelMode } });
         }, 50);
     };
@@ -1404,7 +1419,7 @@ export default function App() {
                     >
                         <View style={styles.bottomSheetInner}>
                             {!selectedPlace && (
-                                <View style={{ paddingHorizontal: 20, paddingVertical: 5, paddingTop: 11, paddingBottom: 16 }}>
+                                <View style={{ paddingHorizontal: 20, paddingVertical: 5, paddingTop: 11 }}>
                                     {(() => {
                                         // Avoid setState in render: compute label only
                                         const activeFilters = Object.entries(filters).filter(([_, v]) => v).map(([k]) => k);
@@ -1423,7 +1438,7 @@ export default function App() {
                                         }
                                         return (
                                             <View>
-                                                <Text style={{ fontSize: 29, paddingVertical: 15, fontWeight: '600', color: '#1e3a8a', textAlign: 'center' }}>
+                                                <Text style={{ fontSize: 29, paddingTop: 15, fontWeight: '600', color: '#1e3a8a', textAlign: 'center' }}>
                                                     {filteredPlaces.length} {label} Found
                                                 </Text>
                                             </View>
@@ -1509,9 +1524,90 @@ export default function App() {
                                 </View>
                             ) : (
                                 <>
+                                    <View
+                                        style={{
+                                            flexDirection: 'row',
+                                            justifyContent: 'center',
+                                            alignItems: 'center',
+                                            marginHorizontal: 18,
+                                            marginVertical: 21.5,
+                                            paddingBottom: 5,
+                                            gap: 10,
+                                        }}
+                                    >
+                                        {/* Walk Button */}
+                                        <TouchableOpacity
+                                            style={[
+                                                {
+                                                    paddingHorizontal: 18,
+                                                    paddingVertical: 8,
+                                                    borderRadius: 999,
+                                                    flexDirection: 'row',
+                                                    alignItems: 'center',
+                                                    borderWidth: 1,
+                                                    borderColor: themeDarkBlue,
+                                                    backgroundColor:
+                                                        travelMode === 'walking' ? themeLightBlue : 'transparent',
+                                                },
+                                            ]}
+                                            onPress={() => setTravelMode('walking')}
+                                        >
+                                            <FontAwesome5
+                                                name="walking"
+                                                size={18}
+                                                color={themeDarkBlue}
+                                                style={{ marginRight: 9 }}
+                                            />
+                                            <Text
+                                                style={{
+                                                    fontSize: 16,
+                                                    fontWeight: '600',
+                                                    color: themeDarkBlue,
+                                                }}
+                                            >
+                                                Walk
+                                            </Text>
+                                        </TouchableOpacity>
+
+                                        {/* Drive Button */}
+                                        <TouchableOpacity
+                                            style={[
+                                                {
+                                                    paddingHorizontal: 15,
+                                                    paddingVertical: 8,
+                                                    borderRadius: 999,
+                                                    flexDirection: 'row',
+                                                    alignItems: 'center',
+                                                    borderWidth: 1,
+                                                    borderColor: themeDarkBlue,
+                                                    backgroundColor:
+                                                        travelMode === 'driving' ? themeLightBlue : 'transparent',
+                                                },
+                                            ]}
+                                            onPress={() => setTravelMode('driving')}
+                                        >
+                                            <FontAwesome5
+                                                name="car"
+                                                size={18}
+                                                color={themeDarkBlue}
+                                                style={{ marginRight: 9 }}
+                                            />
+                                            <Text
+                                                style={{
+                                                    fontSize: 16,
+                                                    fontWeight: '600',
+                                                    color: themeDarkBlue,
+                                                }}
+                                            >
+                                                Drive
+                                            </Text>
+                                        </TouchableOpacity>
+                                    </View>
+
                                     <View style={[styles.filterRow, { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }]}>
-                                        {/* <SortDropdown sortType={sortType} setSortType={setSortType} /> */}
-                                        <TravelModeDropdown travelMode={travelMode} setTravelMode={setTravelMode} />
+                                        <SortDropdown sortType={sortType} setSortType={setSortType} />
+                                        {/* <TravelModeDropdown travelMode={travelMode} setTravelMode={setTravelMode} /> */}
+
                                         <TouchableOpacity
                                             style={[
                                                 styles.openNowBtn,
@@ -1892,7 +1988,7 @@ const styles = StyleSheet.create({
         opacity: 1,
     },
     filterPillUnselected: {
-        backgroundColor: 'rgba(255,255,255,0.9)', // match gps/refresh/filterContainer
+        backgroundColor: 'rgba(255,255,255,0.8)', // match gps/refresh/filterContainer
         borderWidth: 1.5,
         borderColor: 'rgba(30,58,138,0.78)', // subtle blue border
         opacity: 1,

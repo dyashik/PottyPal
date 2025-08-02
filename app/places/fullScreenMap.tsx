@@ -291,7 +291,13 @@ export default function FullscreenMap() {
             </BottomSheet>
             <Pressable
                 style={[styles.directionsButtonContainer, { top: insets.top + 10 }]}
-                onPress={() => router.push({ pathname: '/places/[id]', params: { id: 'someId' } })}
+                onPress={() => {
+                    const placeId = Array.isArray(id) ? id[0] : id || 'someId';
+                    router.push({
+                        pathname: '/places/[id]',
+                        params: { id: placeId }
+                    });
+                }}
             >
                 <View style={styles.directionsButton}>
                     <FontAwesome5 name="info-circle" size={24} color="white" />

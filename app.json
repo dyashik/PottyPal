@@ -2,7 +2,7 @@
   "expo": {
     "name": "PottyPal",
     "slug": "PottyPal",
-    "version": "1.9.0",
+    "version": "1.9.2",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "pottypal",
@@ -16,14 +16,18 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.pottypal.PottyPal",
-      "buildNumber": "10",
+      "buildNumber": "12",
       "config": {
         "googleMapsApiKey": "AIzaSyA924VxnZfLnvUcqN2R9kzFqNjCRTeaIAI"
       },
       "appleTeamId": "LANP267Q8M",
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "This app needs access to your location to show nearby ads and maps.",
-        "NSLocationAlwaysUsageDescription": "This app needs your location to deliver location-based services even when the app is in the background."
+        "NSLocationAlwaysUsageDescription": "This app needs your location to deliver location-based services even when the app is in the background.",
+        "UIDeviceFamily": [
+          1
+        ],
+        "supportsTablet": false
       }
     },
     "android": {
