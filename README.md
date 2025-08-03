@@ -1,5 +1,7 @@
 # 🚽 PottyPal
 
+# Map. Tap. Crap.
+
 **Your trusted companion for finding clean, accessible bathrooms near you!**
 
 PottyPal is a React Native mobile app built with Expo that helps users locate nearby bathrooms in restaurants, cafes, gas stations, grocery stores, and public facilities. With real-time location tracking, detailed directions, and helpful entry tips, PottyPal makes finding a restroom stress-free.
