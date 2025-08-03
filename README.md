@@ -157,20 +157,6 @@ function mapToFilterCategory(type: string): FilterCategory {
 }
 ```
 
-## 🧪 Testing
-
-Run the test suite:
-```bash
-npm test
-# or
-yarn test
-```
-
-The project includes:
-- Unit tests for utility functions
-- Component testing with React Test Renderer
-- Integration tests for map functionality
-
 ## 📱 Platform Support
 
 ### iOS
