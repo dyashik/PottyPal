@@ -51,8 +51,6 @@
       <key>NSAllowsLocalNetworking</key>
       <true/>
     </dict>
-    <key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
-    <string>Allow $(PRODUCT_NAME) to access your location</string>
     <key>NSLocationAlwaysUsageDescription</key>
     <string>This app needs your location to deliver location-based services even when the app is in the background.</string>
     <key>NSLocationWhenInUseUsageDescription</key>
