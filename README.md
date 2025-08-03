@@ -105,71 +105,6 @@ PottyPal/
 └── app.json                    # Expo configuration
 ```
 
-## 🚀 Getting Started
-
-### Prerequisites
-- Node.js (version 18 or higher)
-- npm or yarn
-- Expo CLI
-- iOS Simulator (Mac) or Android Studio (for Android development)
-
-### Installation
-
-1. **Clone the repository**
-   ```bash
-   git clone https://github.com/dyashik/PottyPal.git
-   cd PottyPal
-   ```
-
-2. **Install dependencies**
-   ```bash
-   npm install
-   # or
-   yarn install
-   ```
-
-3. **Set up Google Maps API Keys**
-   - Create a Google Cloud Project
-   - Enable the following APIs:
-     - Maps SDK for iOS
-     - Maps SDK for Android
-     - Places API
-     - Directions API
-     - Distance Matrix API
-   - Create API keys and add them to your environment configuration
-
-4. **Start the development server**
-   ```bash
-   npm start
-   # or
-   yarn start
-   ```
-
-5. **Run on your preferred platform**
-   ```bash
-   # iOS
-   npm run ios
-   
-   # Android
-   npm run android
-   
-   # Web (for testing)
-   npm run web
-   ```
-
-## 🔑 Environment Setup
-
-### Google Maps Configuration
-The app requires Google Maps API keys for different platforms. Add your keys to the appropriate configuration files:
-
-- **iOS**: `ios/PottyPal/Info.plist`
-- **Android**: `android/app/src/main/res/values/strings.xml`
-- **Expo**: `app.json` extra configuration
-
-### Location Permissions
-The app requires location permissions to function properly. Permissions are handled automatically, but users will be prompted to:
-- Allow location access when using the app
-- Enable location services in device settings if previously denied
 
 ## 🎨 Design Philosophy
 
@@ -243,10 +178,6 @@ The project includes:
 - **Architecture**: Universal (iPhone/iPad)
 - **Features**: Native Google Maps, Core Location integration
 
-### Android
-- **Minimum SDK**: Android 21 (Lollipop)
-- **Target SDK**: Android 34
-- **Features**: Google Play Services, Location Services
 
 ## 🔄 API Integration
 
