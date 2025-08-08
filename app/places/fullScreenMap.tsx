@@ -37,7 +37,21 @@ export default function FullscreenMap() {
     const bottomSheetRef = useRef<BottomSheet>(null);
 
     // Snap points for bottom sheet - collapsed & expanded
-    const snapPoints = useMemo(() => ['11%', '50%'], []);
+    const snapPoints = useMemo(() => {
+        const { height } = Dimensions.get('window');
+        const availableHeight = height - insets.top - insets.bottom;
+
+        // Calculate responsive percentages based on screen size
+        // iPhone 13 Pro has ~844px height, so 11% ≈ 93px and 50% ≈ 422px
+        const collapsedHeight = Math.max(80, availableHeight * 0.11);  // minimum 80px
+        const expandedHeight = Math.max(350, availableHeight * 0.50);  // minimum 350px
+
+        // Convert back to percentages of total screen height
+        const collapsedPercent = Math.round((collapsedHeight / height) * 100);
+        const expandedPercent = Math.round((expandedHeight / height) * 100);
+
+        return [`${collapsedPercent}%`, `${expandedPercent}%`];
+    }, [insets]);
 
     // Helper for stripping HTML
     const pottyPalMapStyle = [
@@ -215,16 +229,16 @@ export default function FullscreenMap() {
             </MapView>
 
             {/* Walk/Drive Toggle - always directly under branding container, styled like search this area button, width smaller than branding */}
-            <View style={{ position: 'absolute', top: 56 + 70, alignSelf: 'center', zIndex: 999, width: '25%' }}>
-                <View style={{ flexDirection: 'row', backgroundColor: '#fff', borderRadius: 22, overflow: 'hidden', borderWidth: 1, borderColor: '#e5e7eb', shadowColor: '#000', shadowOpacity: 0.10, shadowOffset: { width: 0, height: 2 }, shadowRadius: 6, elevation: 6, width: '100%', justifyContent: 'center', alignItems: 'center', minWidth: 110 }}>
+            <View style={[styles.toggleContainer, { top: insets.top + 10 + 46 + 22 }]}>
+                <View style={styles.toggleButton}>
                     <TouchableOpacity
-                        style={{ width: '50%', alignItems: 'center', justifyContent: 'center', paddingVertical: 8, backgroundColor: mode === 'walking' ? '#e0f2fe' : '#fff', borderTopLeftRadius: 22, borderBottomLeftRadius: 22 }}
+                        style={[styles.toggleOption, styles.toggleOptionLeft, { backgroundColor: mode === 'walking' ? '#e0f2fe' : '#fff' }]}
                         onPress={() => setMode('walking')}
                     >
                         <FontAwesome5 name="walking" size={22} color={mode === 'walking' ? '#1e3a8a' : '#888'} />
                     </TouchableOpacity>
                     <TouchableOpacity
-                        style={{ width: '50%', alignItems: 'center', justifyContent: 'center', paddingVertical: 8, backgroundColor: mode === 'driving' ? '#e0f2fe' : '#fff', borderTopRightRadius: 22, borderBottomRightRadius: 22 }}
+                        style={[styles.toggleOption, styles.toggleOptionRight, { backgroundColor: mode === 'driving' ? '#e0f2fe' : '#fff' }]}
                         onPress={() => setMode('driving')}
                     >
                         <FontAwesome5 name="car" size={22} color={mode === 'driving' ? '#1e3a8a' : '#888'} />
@@ -493,5 +507,40 @@ const styles = StyleSheet.create({
         marginTop: 20,
         fontSize: 16,
         color: '#999',
+    },
+    toggleContainer: {
+        position: 'absolute',
+        left: 0,
+        right: 0,
+        alignItems: 'center',
+        zIndex: 999,
+    },
+    toggleButton: {
+        flexDirection: 'row',
+        backgroundColor: '#fff',
+        borderRadius: 22,
+        overflow: 'hidden',
+        borderWidth: 1,
+        borderColor: '#e5e7eb',
+        shadowColor: '#000',
+        shadowOpacity: 0.10,
+        shadowOffset: { width: 0, height: 2 },
+        shadowRadius: 6,
+        elevation: 6,
+        minWidth: 110,
+    },
+    toggleOption: {
+        width: 55, // Fixed width instead of percentage for better centering
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 8,
+    },
+    toggleOptionLeft: {
+        borderTopLeftRadius: 22,
+        borderBottomLeftRadius: 22,
+    },
+    toggleOptionRight: {
+        borderTopRightRadius: 22,
+        borderBottomRightRadius: 22,
     },
 });

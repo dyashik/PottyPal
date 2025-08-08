@@ -295,9 +295,22 @@ export default function App() {
     }, [filteredPlaces.length]);
 
     const snapPoints = useMemo(() => {
+        const { height } = Dimensions.get('window');
+        const availableHeight = height - insets.top - insets.bottom;
 
-        return selectedPlace ? ['31%'] : ['12.5%', '55%'];
-    }, [selectedPlace]);
+        // Calculate responsive percentages based on screen size
+        // iPhone 13 Pro has ~844px height, so 31% ≈ 262px and 12.5% ≈ 106px, 55% ≈ 464px
+        const collapsedHeight = Math.max(100, availableHeight * 0.135); // minimum 100px
+        const selectedHeight = Math.max(250, availableHeight * 0.31);   // minimum 250px  
+        const expandedHeight = Math.max(400, availableHeight * 0.70);   // minimum 400px
+
+        // Convert back to percentages of total screen height
+        const collapsedPercent = Math.round((collapsedHeight / height) * 100);
+        const selectedPercent = Math.round((selectedHeight / height) * 100);
+        const expandedPercent = Math.round((expandedHeight / height) * 100);
+
+        return selectedPlace ? [`${selectedPercent}%`] : [`${collapsedPercent}%`, `${expandedPercent}%`];
+    }, [selectedPlace, insets]);
 
 
 
@@ -900,6 +913,7 @@ export default function App() {
 
         // Short delay to ensure store is updated before navigating
         setTimeout(() => {
+            // console.log('Navigating to place details:', id, travelMode);
             router.push({ pathname: '/places/[id]', params: { id, travelMode: travelMode } });
         }, 50);
     };

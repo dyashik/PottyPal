@@ -19,7 +19,7 @@
     <key>CFBundlePackageType</key>
     <string>$(PRODUCT_BUNDLE_PACKAGE_TYPE)</string>
     <key>CFBundleShortVersionString</key>
-    <string>1.9.2</string>
+    <string>1.9.3</string>
     <key>CFBundleSignature</key>
     <string>????</string>
     <key>CFBundleURLTypes</key>
@@ -33,7 +33,7 @@
       </dict>
     </array>
     <key>CFBundleVersion</key>
-    <string>12</string>
+    <string>13</string>
     <key>GADApplicationIdentifier</key>
     <string>ca-app-pub-3844546379677181~2775797959</string>
     <key>GADDelayAppMeasurementInit</key>
@@ -51,10 +51,12 @@
       <key>NSAllowsLocalNetworking</key>
       <true/>
     </dict>
+    <key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+    <string>Allow $(PRODUCT_NAME) to access your location</string>
     <key>NSLocationAlwaysUsageDescription</key>
-    <string>This app needs your location to deliver location-based services even when the app is in the background.</string>
+    <string>This app uses your location in the background to notify you about nearby restrooms even if the app isn't open, so you never miss a bathroom when you're on the move.</string>
     <key>NSLocationWhenInUseUsageDescription</key>
-    <string>This app needs access to your location to show nearby ads and maps.</string>
+    <string>This app uses your location to show restrooms near you on a map, helping you quickly find clean and accessible options while traveling.</string>
     <key>NSUserActivityTypes</key>
     <array>
       <string>$(PRODUCT_BUNDLE_IDENTIFIER).expo.index_route</string>

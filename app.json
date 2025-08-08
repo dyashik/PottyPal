@@ -2,7 +2,7 @@
   "expo": {
     "name": "PottyPal",
     "slug": "PottyPal",
-    "version": "1.9.2",
+    "version": "1.9.3",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "pottypal",
@@ -16,14 +16,14 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.pottypal.PottyPal",
-      "buildNumber": "12",
+      "buildNumber": "13",
       "config": {
         "googleMapsApiKey": "AIzaSyA924VxnZfLnvUcqN2R9kzFqNjCRTeaIAI"
       },
       "appleTeamId": "LANP267Q8M",
       "infoPlist": {
-        "NSLocationWhenInUseUsageDescription": "This app needs access to your location to show nearby ads and maps.",
-        "NSLocationAlwaysUsageDescription": "This app needs your location to deliver location-based services even when the app is in the background.",
+        "NSLocationWhenInUseUsageDescription": "This app uses your location to show restrooms near you on a map, helping you quickly find clean and accessible options while traveling.",
+        "NSLocationAlwaysUsageDescription": "This app uses your location in the background to notify you about nearby restrooms even if the app isn't open, so you never miss a bathroom when you're on the move.",
         "UIDeviceFamily": [
           1
         ],
