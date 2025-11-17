@@ -11,8 +11,14 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Place } from '@/utils/api';
 import BrandingContainer from '@/components/BrandingContainer';
 import CustomCallout from '@/components/CustomCallout';
+import { BannerAd, BannerAdSize, TestIds, InterstitialAd, AdEventType } from 'react-native-google-mobile-ads';
 
 type LatLng = { latitude: number; longitude: number };
+
+// Create interstitial ad instance outside component to persist across renders
+const interstitial = InterstitialAd.createForAdRequest('ca-app-pub-3844546379677181/3717603941', {
+    requestNonPersonalizedAdsOnly: false,
+});
 
 export default function FullscreenMap() {
     const { id, lat, lng, name, type, walkingURL, travelMode, distanceInfo } = useLocalSearchParams();
@@ -35,6 +41,7 @@ export default function FullscreenMap() {
     const [steps, setSteps] = useState<any[]>([]); // Directions steps from API
     const [expanded, setExpanded] = useState(false);
     const bottomSheetRef = useRef<BottomSheet>(null);
+    const [interstitialLoaded, setInterstitialLoaded] = useState(false);
 
     // Snap points for bottom sheet - collapsed & expanded
     const snapPoints = useMemo(() => {
@@ -76,6 +83,29 @@ export default function FullscreenMap() {
         Linking.openURL(url);
     };
 
+
+    // Load interstitial ad on component mount
+    useEffect(() => {
+        const unsubscribeLoaded = interstitial.addAdEventListener(AdEventType.LOADED, () => {
+            setInterstitialLoaded(true);
+            console.log('Interstitial ad loaded');
+        });
+
+        const unsubscribeClosed = interstitial.addAdEventListener(AdEventType.CLOSED, () => {
+            console.log('Interstitial ad closed');
+            // Reload the ad for next time
+            interstitial.load();
+        });
+
+        // Load the interstitial ad
+        interstitial.load();
+
+        // Cleanup listeners on unmount
+        return () => {
+            unsubscribeLoaded();
+            unsubscribeClosed();
+        };
+    }, []);
 
     useEffect(() => {
         (async () => {
@@ -228,81 +258,81 @@ export default function FullscreenMap() {
                 />
             </MapView>
 
-            {/* Walk/Drive Toggle - always directly under branding container, styled like search this area button, width smaller than branding */}
-            <View style={[styles.toggleContainer, { top: insets.top + 10 + 46 + 22 }]}>
-                <View style={styles.toggleButton}>
+            {/* Combined Go Button with Walk/Drive Toggle */}
+            <View style={[styles.combinedGoButtonContainer, { bottom: 80 }]}>
+                <View style={styles.combinedGoButton}>
+                    {/* Left side: Walk/Drive toggle */}
+                    <View style={styles.modeToggleSection}>
+                        <TouchableOpacity
+                            style={[styles.modeOption, { backgroundColor: mode === 'walking' ? '#e0f2fe' : 'transparent' }]}
+                            onPress={() => setMode('walking')}
+                        >
+                            <FontAwesome5 name="walking" size={18} color={mode === 'walking' ? '#1e3a8a' : '#666'} />
+                        </TouchableOpacity>
+                        <View style={styles.modeDivider} />
+                        <TouchableOpacity
+                            style={[styles.modeOption, { backgroundColor: mode === 'driving' ? '#e0f2fe' : 'transparent' }]}
+                            onPress={() => setMode('driving')}
+                        >
+                            <FontAwesome5 name="car" size={18} color={mode === 'driving' ? '#1e3a8a' : '#666'} />
+                        </TouchableOpacity>
+                    </View>
+
+                    {/* Center: Time/Distance Info */}
+                    {parsedDistanceInfo[mode]?.duration && (
+                        <View style={styles.timeDistanceSection}>
+                            <Text style={styles.durationText}>{parsedDistanceInfo[mode]?.duration}</Text>
+                            {parsedDistanceInfo[mode]?.distance && (
+                                <Text style={styles.distanceText}>{parsedDistanceInfo[mode]?.distance}</Text>
+                            )}
+                        </View>
+                    )}
+
+                    {/* Right side: GO button */}
                     <TouchableOpacity
-                        style={[styles.toggleOption, styles.toggleOptionLeft, { backgroundColor: mode === 'walking' ? '#e0f2fe' : '#fff' }]}
-                        onPress={() => setMode('walking')}
+                        style={styles.goButtonSection}
+                        onPress={() => {
+                            if (currentLocation) {
+                                // Show interstitial ad if loaded, otherwise navigate directly
+                                if (interstitialLoaded) {
+                                    // Set up listener for when ad is closed
+                                    const unsubscribe = interstitial.addAdEventListener(AdEventType.CLOSED, () => {
+                                        unsubscribe();
+                                        router.push({
+                                            pathname: '/places/navigation',
+                                            params: {
+                                                originLat: currentLocation.latitude,
+                                                originLng: currentLocation.longitude,
+                                                destLat: latNum,
+                                                destLng: lngNum,
+                                                destName: name as string,
+                                                travelMode: mode
+                                            }
+                                        });
+                                    });
+                                    interstitial.show();
+                                } else {
+                                    // Ad not loaded yet, navigate directly
+                                    router.push({
+                                        pathname: '/places/navigation',
+                                        params: {
+                                            originLat: currentLocation.latitude,
+                                            originLng: currentLocation.longitude,
+                                            destLat: latNum,
+                                            destLng: lngNum,
+                                            destName: name as string,
+                                            travelMode: mode
+                                        }
+                                    });
+                                }
+                            }
+                        }}
                     >
-                        <FontAwesome5 name="walking" size={22} color={mode === 'walking' ? '#1e3a8a' : '#888'} />
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                        style={[styles.toggleOption, styles.toggleOptionRight, { backgroundColor: mode === 'driving' ? '#e0f2fe' : '#fff' }]}
-                        onPress={() => setMode('driving')}
-                    >
-                        <FontAwesome5 name="car" size={22} color={mode === 'driving' ? '#1e3a8a' : '#888'} />
+                        <Text style={styles.goButtonText}>GO</Text>
                     </TouchableOpacity>
                 </View>
             </View>
 
-            {/* Estimated Walk Time Vertical Pill */}
-            {parsedDistanceInfo[mode]?.duration && (
-                <View style={styles.walkTimePillContainer} pointerEvents="none">
-                    <View style={styles.walkTimePill}>
-                        <FontAwesome5 name={mode === 'walking' ? 'walking' : 'car'} size={20} color="#fff" style={{ marginBottom: 2 }} />
-                        <Text style={styles.walkTimePillTime}>
-                            {parsedDistanceInfo[mode]?.duration}
-                        </Text>
-                        <Text style={styles.walkTimePillLabel}>{mode === 'walking' ? 'walk' : 'drive'}</Text>
-                        {parsedDistanceInfo[mode]?.distance && (
-                            <Text style={[styles.walkTimePillLabel, { fontSize: 11, opacity: 0.7 }]}>{parsedDistanceInfo[mode]?.distance}</Text>
-                        )}
-                    </View>
-                </View>
-            )}
-
-            {/* Bottom Sheet */}
-            <BottomSheet
-                ref={bottomSheetRef}
-                index={0}
-                snapPoints={snapPoints}
-                enablePanDownToClose={false}
-                backgroundStyle={styles.bottomSheet}
-                handleIndicatorStyle={{ backgroundColor: '#1e3a8a' }}
-            >
-                {/* Directions Header */}
-                <View style={{ backgroundColor: 'rgba(255, 255, 255, 0.85)', paddingHorizontal: 20, paddingBottom: 16 }}>
-                    <Text style={{ fontSize: 29, paddingVertical: 5, fontWeight: '600', color: '#1e3a8a', textAlign: 'center' }}>
-                        Directions
-                    </Text>
-                </View>
-
-                <BottomSheetFlatList
-                    data={steps}
-                    keyExtractor={(_, i) => i.toString()}
-                    contentContainerStyle={styles.bottomSheetInner}
-                    renderItem={({ item, index }) => (
-                        <View style={styles.stepRow}>
-                            <Text style={styles.stepIndex}>{index + 1}.</Text>
-                            <Text style={styles.stepText}>{item.cleaned_instructions}</Text>
-                        </View>
-                    )}
-                    ListEmptyComponent={() => <Text style={styles.emptyText}>No directions available.</Text>}
-                    showsVerticalScrollIndicator={false}
-                />
-                <View style={{ alignItems: 'center', paddingVertical: 25, backgroundColor: 'rgba(255,255,255,0.85)' }}>
-                    <TouchableOpacity
-                        style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#1e3a8a', borderRadius: 999, paddingVertical: 10, paddingHorizontal: 24, marginTop: 8, shadowColor: '#000', shadowOpacity: 0.12, shadowOffset: { width: 0, height: 2 }, shadowRadius: 4, elevation: 4 }}
-                        onPress={() => {
-                            openGoogleMaps(walkingURL as string);
-                        }}
-                    >
-                        <FontAwesome5 name="map-marked-alt" size={20} color="#fff" style={{ marginRight: 10 }} />
-                        <Text style={{ color: '#fff', fontWeight: '700', fontSize: 16 }}>Open in Google Maps</Text>
-                    </TouchableOpacity>
-                </View>
-            </BottomSheet>
             <Pressable
                 style={[styles.directionsButtonContainer, { top: insets.top + 10 }]}
                 onPress={() => {
@@ -317,49 +347,91 @@ export default function FullscreenMap() {
                     <FontAwesome5 name="info-circle" size={24} color="white" />
                 </View>
             </Pressable>
+            <View>
+                <BannerAd
+                    unitId={TestIds.BANNER}
+                    size={BannerAdSize.ANCHORED_ADAPTIVE_BANNER}
+                    requestOptions={{
+                        requestNonPersonalizedAdsOnly: false,
+                    }}
+                />
+            </View>
         </View >
     );
 }
 
 const styles = StyleSheet.create({
-    walkTimePillContainer: {
+    combinedGoButtonContainer: {
         position: 'absolute',
-        bottom: 90, // above the bottom sheet/directions button
-        right: 15,
-        pointerEvents: 'none',
-    },
-    walkTimePill: {
-        backgroundColor: '#1e3a8a',
-        borderRadius: 18,
-        paddingVertical: 10,
-        paddingHorizontal: 12,
-        minWidth: 38,
-        minHeight: 60,
+        left: 0,
+        right: 0,
         alignItems: 'center',
-        justifyContent: 'center',
-        flexDirection: 'column',
+        zIndex: 999,
+    },
+    combinedGoButton: {
+        flexDirection: 'row',
+        backgroundColor: '#fff',
+        borderRadius: 30,
+        overflow: 'hidden',
+        borderWidth: 1,
+        borderColor: '#e5e7eb',
         shadowColor: '#000',
-        shadowOpacity: 0.13,
+        shadowOpacity: 0.15,
         shadowOffset: { width: 0, height: 2 },
         shadowRadius: 8,
         elevation: 8,
-        gap: 2,
+        alignItems: 'center',
+        paddingVertical: 6,
+        paddingHorizontal: 8,
+        gap: 12,
     },
-    walkTimePillTime: {
-        color: 'white',
+    modeToggleSection: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+    },
+    modeOption: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    modeDivider: {
+        width: 1,
+        height: 24,
+        backgroundColor: '#d1d5db',
+    },
+    timeDistanceSection: {
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingHorizontal: 8,
+    },
+    durationText: {
+        fontSize: 16,
         fontWeight: '700',
-        fontSize: 13,
-        marginBottom: 0,
-        textAlign: 'center',
+        color: '#1e3a8a',
     },
-    walkTimePillLabel: {
-        color: 'white',
-        fontWeight: '600',
+    distanceText: {
         fontSize: 12,
-        marginTop: -1,
-        textAlign: 'center',
-        letterSpacing: 0.2,
-        opacity: 0.85,
+        fontWeight: '500',
+        color: '#6b7280',
+        marginTop: -2,
+    },
+    goButtonSection: {
+        backgroundColor: '#12d65aff',
+        borderRadius: 24,
+        paddingVertical: 10,
+        paddingHorizontal: 24,
+        minWidth: 70,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    goButtonText: {
+        color: '#fff',
+        fontWeight: '700',
+        fontSize: 18,
+        letterSpacing: 0.5,
     },
     brandingContainer: {
         position: 'absolute',
@@ -507,40 +579,5 @@ const styles = StyleSheet.create({
         marginTop: 20,
         fontSize: 16,
         color: '#999',
-    },
-    toggleContainer: {
-        position: 'absolute',
-        left: 0,
-        right: 0,
-        alignItems: 'center',
-        zIndex: 999,
-    },
-    toggleButton: {
-        flexDirection: 'row',
-        backgroundColor: '#fff',
-        borderRadius: 22,
-        overflow: 'hidden',
-        borderWidth: 1,
-        borderColor: '#e5e7eb',
-        shadowColor: '#000',
-        shadowOpacity: 0.10,
-        shadowOffset: { width: 0, height: 2 },
-        shadowRadius: 6,
-        elevation: 6,
-        minWidth: 110,
-    },
-    toggleOption: {
-        width: 55, // Fixed width instead of percentage for better centering
-        alignItems: 'center',
-        justifyContent: 'center',
-        paddingVertical: 8,
-    },
-    toggleOptionLeft: {
-        borderTopLeftRadius: 22,
-        borderBottomLeftRadius: 22,
-    },
-    toggleOptionRight: {
-        borderTopRightRadius: 22,
-        borderBottomRightRadius: 22,
     },
 });

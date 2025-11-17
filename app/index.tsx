@@ -29,8 +29,8 @@ import { PortalProvider } from '@gorhom/portal';
 import BrandingContainer from '@/components/BrandingContainer';
 import CustomCallout from '@/components/CustomCallout';
 import TravelModeDropdown from '../components/TravelModeDropdown';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import LoadingIndicator from '@/components/LoadingIndicator';
-
 
 const { width } = Dimensions.get('window');
 
@@ -39,6 +39,11 @@ export default function App() {
     const animatedIndex = useSharedValue(0);
     const checkedAreasRef = useRef<{ latitude: number, longitude: number, radius: number }[]>([]);
     const bottomSheetRef = useRef<BottomSheet>(null);
+
+    // Cache for storing fetched places by location
+    const placesCache = useRef<Map<string, { places: Place[], timestamp: number }>>(new Map());
+    const CACHE_DURATION = 12 * 60 * 60 * 1000; // 12 hours in milliseconds    
+    const CACHE_DISTANCE_THRESHOLD = 100; // meters - if within this distance, use cache
 
     const refreshAnim = useSharedValue(0);
     const [region, setRegion] = useState<Region | null>(null);
@@ -67,6 +72,7 @@ export default function App() {
     const [loadingTimeout, setLoadingTimeout] = useState<number | null>(null);
     const [maxLoadingTimeout, setMaxLoadingTimeout] = useState<number | null>(null);
     const [showTravelDropdown, setShowTravelDropdown] = useState(false);
+    const [isTravelModeExpanded, setIsTravelModeExpanded] = useState(false);
     const themeLightBlue = 'rgba(224, 242, 253, 1)'; // light background
     const themeDarkBlue = '#1e3a8a'; // strong blue border and text
 
@@ -299,17 +305,19 @@ export default function App() {
         const availableHeight = height - insets.top - insets.bottom;
 
         // Calculate responsive percentages based on screen size
-        // iPhone 13 Pro has ~844px height, so 31% ≈ 262px and 12.5% ≈ 106px, 55% ≈ 464px
-        const collapsedHeight = Math.max(100, availableHeight * 0.135); // minimum 100px
-        const selectedHeight = Math.max(250, availableHeight * 0.31);   // minimum 250px  
+        // iPhone 13 Pro has ~844px height, so 31% ≈ 262px and 12.5% ≈ 106px, 50% ≈ 422px, 55% ≈ 464px
+        const collapsedHeight = Math.max(100, availableHeight * 0.05); // minimum 100px
+        const midHeight = Math.max(300, availableHeight * 0.40);         // minimum 300px - 55% for list view (increased from 50%)
+        const selectedHeight = Math.max(280, availableHeight * 0.33);   // minimum 280px - 38% for selected place (increased from 31%)
         const expandedHeight = Math.max(400, availableHeight * 0.70);   // minimum 400px
 
         // Convert back to percentages of total screen height
         const collapsedPercent = Math.round((collapsedHeight / height) * 100);
+        const midPercent = Math.round((midHeight / height) * 100);
         const selectedPercent = Math.round((selectedHeight / height) * 100);
         const expandedPercent = Math.round((expandedHeight / height) * 100);
 
-        return selectedPlace ? [`${selectedPercent}%`] : [`${collapsedPercent}%`, `${expandedPercent}%`];
+        return selectedPlace ? [`${selectedPercent}%`] : [`${collapsedPercent}%`, `${midPercent}%`, `${expandedPercent}%`];
     }, [selectedPlace, insets]);
 
 
@@ -364,6 +372,11 @@ export default function App() {
                 }, 3000);
 
                 setShowNoBathroomsAlert(false);
+
+                // Open bottom sheet to 50% (index 1) to show the list
+                setTimeout(() => {
+                    bottomSheetRef.current?.snapToIndex(2);
+                }, 500);
             }
         })();
 
@@ -452,6 +465,244 @@ export default function App() {
     });
 
 
+    // Helper function to check if a place should be open based on its weekday descriptions
+    const shouldPlaceBeOpen = (place: Place): boolean | null => {
+        if (!place.currentOpeningHours?.weekdayDescriptions) return null;
+
+        const now = new Date();
+        const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+        const currentDay = dayNames[now.getDay()];
+        const currentTime = now.getHours() * 60 + now.getMinutes(); // Current time in minutes since midnight
+
+        // Find today's hours
+        const todayHours = place.currentOpeningHours.weekdayDescriptions.find(desc =>
+            desc.startsWith(currentDay)
+        );
+
+        if (!todayHours) return null;
+
+        // Check if closed all day
+        if (todayHours.includes('Closed')) return false;
+
+        // Check if open 24 hours
+        if (todayHours.includes('Open 24 hours')) return true;
+
+        // Parse hours like "Monday: 9:00 AM – 5:00 PM" or "Monday: 9:00 AM – 12:00 AM"
+        const timeMatch = todayHours.match(/(\d{1,2}):(\d{2})\s*(AM|PM)\s*–\s*(\d{1,2}):(\d{2})\s*(AM|PM)/);
+        if (!timeMatch) return null;
+
+        const [_, startHour, startMin, startPeriod, endHour, endMin, endPeriod] = timeMatch;
+
+        // Convert to 24-hour format
+        let openTime = parseInt(startHour) * 60 + parseInt(startMin);
+        if (startPeriod === 'PM' && parseInt(startHour) !== 12) openTime += 12 * 60;
+        if (startPeriod === 'AM' && parseInt(startHour) === 12) openTime = parseInt(startMin);
+
+        let closeTime = parseInt(endHour) * 60 + parseInt(endMin);
+        if (endPeriod === 'PM' && parseInt(endHour) !== 12) closeTime += 12 * 60;
+        if (endPeriod === 'AM' && parseInt(endHour) === 12) closeTime = parseInt(endMin);
+
+        // Handle cases where closing time is past midnight
+        if (closeTime < openTime) {
+            return currentTime >= openTime || currentTime <= closeTime;
+        }
+
+        return currentTime >= openTime && currentTime <= closeTime;
+    };
+
+    // Validate cached places - if ANY place has stale open/closed status, return null to trigger full refresh
+    const validateCachedPlaces = (cachedPlaces: Place[]): boolean => {
+        // Check each place for stale open/closed status
+        for (const place of cachedPlaces) {
+            const shouldBeOpen = shouldPlaceBeOpen(place);
+            const isMarkedOpen = place.currentOpeningHours?.openNow;
+
+            // Skip if we can't determine what the status should be
+            if (shouldBeOpen === null) continue;
+
+            // Check if marked closed but should be open
+            if (shouldBeOpen === true && isMarkedOpen === false) {
+                console.log('🔄 Cache is stale - place marked CLOSED but should be OPEN:', place.displayName?.text);
+                console.log('⚠️ Breaking cache and triggering full refresh...');
+                return false; // Cache is invalid
+            }
+
+            // Check if marked open but should be closed
+            if (shouldBeOpen === false && isMarkedOpen === true) {
+                console.log('🔄 Cache is stale - place marked OPEN but should be CLOSED:', place.displayName?.text);
+                console.log('⚠️ Breaking cache and triggering full refresh...');
+                return false; // Cache is invalid
+            }
+        }
+
+        return true; // Cache is valid
+    };
+
+    // Generate cache key from location coordinates (rounded to reduce precision)
+    const generateCacheKey = (latitude: number, longitude: number, radius: number): string => {
+        // Round to 5 decimal places (~5 meters precision)
+        const lat = Math.round(latitude * 100000) / 100000;
+        const lng = Math.round(longitude * 100000) / 100000;
+        const rad = Math.round(radius);
+        return `${lat},${lng},${rad}`;
+    };
+
+    // Check if cached data exists and is still valid
+    const getCachedPlaces = async (latitude: number, longitude: number, radius: number): Promise<Place[] | null> => {
+        const currentTime = Date.now();
+
+        // Check exact match first
+        const exactKey = generateCacheKey(latitude, longitude, radius);
+        let exactMatch = placesCache.current.get(exactKey);
+
+        // If not in memory, try loading from AsyncStorage
+        if (!exactMatch) {
+            try {
+                const stored = await AsyncStorage.getItem(`cache_${exactKey}`);
+                if (stored) {
+                    exactMatch = JSON.parse(stored);
+                    // Restore to memory cache
+                    if (exactMatch) {
+                        placesCache.current.set(exactKey, exactMatch);
+                    }
+                }
+            } catch (error) {
+                console.error('Failed to load from AsyncStorage:', error);
+            }
+        }
+
+        if (exactMatch && (currentTime - exactMatch.timestamp) < CACHE_DURATION) {
+            // If cached data is empty, ignore it and fetch fresh data
+            if (exactMatch.places.length === 0) {
+                console.log('⚠️ Cache HIT but empty - will fetch fresh data:', exactKey);
+                placesCache.current.delete(exactKey);
+                await AsyncStorage.removeItem(`cache_${exactKey}`);
+                return null;
+            }
+            console.log('✅ Cache HIT (exact match):', exactKey);
+
+            // Validate cache - if any place has stale status, return null to trigger full refresh
+            const isCacheValid = validateCachedPlaces(exactMatch.places);
+            if (!isCacheValid) {
+                // Remove stale cache and trigger fresh fetch
+                placesCache.current.delete(exactKey);
+                await AsyncStorage.removeItem(`cache_${exactKey}`);
+                return null;
+            }
+
+            return exactMatch.places;
+        }
+
+        // Check for nearby cached locations (within threshold)
+        // First, get all cache keys from AsyncStorage
+        try {
+            const allKeys = await AsyncStorage.getAllKeys();
+            const cacheKeys = allKeys.filter(key => key.startsWith('cache_'));
+
+            for (const storageKey of cacheKeys) {
+                const key = storageKey.replace('cache_', '');
+                let cached = placesCache.current.get(key);
+
+                // Load from AsyncStorage if not in memory
+                if (!cached) {
+                    try {
+                        const stored = await AsyncStorage.getItem(storageKey);
+                        if (stored) {
+                            cached = JSON.parse(stored);
+                            if (cached) {
+                                placesCache.current.set(key, cached);
+                            }
+                        }
+                    } catch (error) {
+                        console.error('Failed to load cached entry:', error);
+                        continue;
+                    }
+                }
+
+                if (!cached) continue;
+
+                if ((currentTime - cached.timestamp) >= CACHE_DURATION) {
+                    // Remove expired cache entries
+                    placesCache.current.delete(key);
+                    await AsyncStorage.removeItem(storageKey);
+                    continue;
+                }
+
+                const [cachedLat, cachedLng, cachedRad] = key.split(',').map(Number);
+
+                // Calculate distance between requested location and cached location
+                const R = 6371000; // Earth's radius in meters
+                const dLat = (latitude - cachedLat) * Math.PI / 180;
+                const dLng = (longitude - cachedLng) * Math.PI / 180;
+                const a = Math.sin(dLat / 2) ** 2 +
+                    Math.cos(cachedLat * Math.PI / 180) * Math.cos(latitude * Math.PI / 180) *
+                    Math.sin(dLng / 2) ** 2;
+                const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+                const distance = R * c;
+
+                // If within threshold and similar radius, use cached data
+                const radiusDiff = Math.abs(radius - cachedRad);
+                const radiusRatio = Math.min(radius, cachedRad) / Math.max(radius, cachedRad);
+
+                // Cache hit requires:
+                // 1. Location within CACHE_DISTANCE_THRESHOLD
+                // 2. Radius difference within 15% OR radius ratio > 0.85 (meaning radii are similar)
+                // 3. The cached radius should be at least 85% of requested radius to ensure coverage
+                const isRadiusSimilar = radiusDiff <= (radius * 0.15) || radiusRatio >= 0.85;
+                const hasSufficientCoverage = cachedRad >= (radius * 0.85);
+
+                if (distance <= CACHE_DISTANCE_THRESHOLD && isRadiusSimilar && hasSufficientCoverage) {
+                    // If cached data is empty, ignore it and fetch fresh data
+                    if (cached.places.length === 0) {
+                        console.log('⚠️ Cache HIT (nearby) but empty - will fetch fresh data:', key);
+                        placesCache.current.delete(key);
+                        await AsyncStorage.removeItem(storageKey);
+                        return null;
+                    }
+                    console.log('✅ Cache HIT (nearby):', key, `distance: ${distance.toFixed(0)}m, radiusDiff: ${radiusDiff.toFixed(0)}m (${(radiusDiff / radius * 100).toFixed(1)}%)`);
+
+                    // Validate cache - if any place has stale status, skip this cache and continue searching
+                    const isCacheValid = validateCachedPlaces(cached.places);
+                    if (!isCacheValid) {
+                        // Remove stale cache and continue searching
+                        placesCache.current.delete(key);
+                        await AsyncStorage.removeItem(storageKey);
+                        continue;
+                    }
+
+                    return cached.places;
+                } else if (distance <= CACHE_DISTANCE_THRESHOLD) {
+                    console.log('❌ Cache MISS (radius mismatch):', key, `distance: ${distance.toFixed(0)}m OK, but radiusDiff: ${radiusDiff.toFixed(0)}m (${(radiusDiff / radius * 100).toFixed(1)}%), coverage: ${(cachedRad / radius * 100).toFixed(1)}%`);
+                }
+            }
+        } catch (error) {
+            console.error('Failed to check nearby cache:', error);
+        }
+
+        console.log('❌ Cache MISS for:', generateCacheKey(latitude, longitude, radius));
+        return null;
+    };
+
+    // Store places in cache
+    const cachePlaces = async (latitude: number, longitude: number, radius: number, places: Place[]): Promise<void> => {
+        const key = generateCacheKey(latitude, longitude, radius);
+        const cacheData = {
+            places,
+            timestamp: Date.now()
+        };
+
+        // Save to memory cache
+        placesCache.current.set(key, cacheData);
+
+        // Save to persistent storage
+        try {
+            await AsyncStorage.setItem(`cache_${key}`, JSON.stringify(cacheData));
+            console.log('💾 Cached places for:', key, `(${places.length} places)`);
+        } catch (error) {
+            console.error('Failed to save to AsyncStorage:', error);
+        }
+    };
+
     const mergeUniquePlaces = (oldPlaces: Place[], newPlaces: Place[]): Place[] => {
         const placeMap = new Map<string, Place>();
         oldPlaces.forEach(place => {
@@ -489,11 +740,23 @@ export default function App() {
         longitude: number,
         radius: number
     ): Promise<Place[]> => {
-        // Only show loading indicator if fetch takes more than 500ms
+        // Show loading indicator immediately
         const loadingTimer = setTimeout(() => {
             setIsLoading(true);
-        }, 500);
+        }, 100); // Short delay to avoid flicker for very fast operations
         setLoadingTimeout(loadingTimer);
+
+        // Check cache first
+        const cachedPlaces = await getCachedPlaces(latitude, longitude, radius);
+        if (cachedPlaces) {
+            // Brief delay to show loading indicator even for cached data
+            await new Promise(resolve => setTimeout(resolve, 300));
+            // Clear loading indicator
+            if (loadingTimer) clearTimeout(loadingTimer);
+            setLoadingTimeout(null);
+            setIsLoading(false);
+            return cachedPlaces;
+        }
 
         // Maximum loading timeout of 2 seconds - stop all loading after this
         const maxTimer = setTimeout(() => {
@@ -581,13 +844,18 @@ export default function App() {
             );
 
             // Only return those with restrooms and correct type
-            return updatedPlaces.filter(
+            const filteredPlaces = updatedPlaces.filter(
                 (place): place is Place =>
                 (
                     ((place as Place)?.restroom === true ||
                         (place as Place)?.primaryType === 'public_bathroom')
                 )
             );
+
+            // Cache the results before returning
+            await cachePlaces(latitude, longitude, radius, filteredPlaces);
+
+            return filteredPlaces;
         } catch (error) {
             console.error("Error fetching places:", error);
             return [];
@@ -718,6 +986,11 @@ export default function App() {
             initialRegionTimeoutRef.current = setTimeout(() => {
                 ignoreRegionChangeRef.current = false;
             }, 2000);
+
+
+            setTimeout(() => {
+                bottomSheetRef.current?.snapToIndex(2);
+            }, 500);
         }
     };
 
@@ -805,6 +1078,10 @@ export default function App() {
                                 }, 2000); // Hide after 2s
                             } else {
                                 setShowNoBathroomsAlert(false);
+                                // Open bottom sheet to 50% (index 1) to show changes in list
+                                setTimeout(() => {
+                                    bottomSheetRef.current?.snapToIndex(1);
+                                }, 300);
                             }
                             return merged;
                         });
@@ -931,13 +1208,40 @@ export default function App() {
         // set item mode
         // item.travelMode = mode; // Removed to avoid type error
 
+        // Get category icon for this place
+        const category = mapToFilterCategory(item.primaryType);
+        let categoryIcon: React.ReactElement | null = null;
+
+        switch (category) {
+            case 'restaurant':
+                categoryIcon = <MaterialCommunityIcons name="silverware-fork-knife" size={20} color="#006400" style={{ marginLeft: 6 }} />;
+                break;
+            case 'cafe':
+                categoryIcon = <MaterialCommunityIcons name="coffee" size={20} color="#8B4513" style={{ marginLeft: 6 }} />;
+                break;
+            case 'grocery_store':
+                categoryIcon = <MaterialCommunityIcons name="cart" size={20} color="#CC7000" style={{ marginLeft: 6 }} />;
+                break;
+            case 'public_bathroom':
+                categoryIcon = <FontAwesome5 name="toilet" size={18} color="#000080" style={{ marginLeft: 6 }} />;
+                break;
+            case 'pit_stop':
+                categoryIcon = <MaterialCommunityIcons name="gas-station" size={20} color="#CC0000" style={{ marginLeft: 6 }} />;
+                break;
+            case 'bar':
+                categoryIcon = <Entypo name="drink" size={20} color="#000000" style={{ marginLeft: 6 }} />;
+                break;
+        }
+
         return (
             <View style={styles.placeItemContainer}>
                 {/* Left: Info */}
                 <TouchableOpacity onPress={() => onMarkerPress(item)} style={styles.placeInfoContainer}>
-                    <Text style={styles.placeName} numberOfLines={1}>
-                        {item.displayName?.text ?? 'Unnamed Place'}
-                    </Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                        <Text style={styles.placeName} numberOfLines={1}>
+                            {categoryIcon}  {item.displayName?.text ?? 'Unnamed Place'}
+                        </Text>
+                    </View>
 
                     {item.rating != null && (
                         <Text style={styles.placeRating}>
@@ -1106,36 +1410,6 @@ export default function App() {
                             showsHorizontalScrollIndicator={false}
                             contentContainerStyle={{ gap: 10, paddingHorizontal: 8 }}
                         >
-                            {/* Restaurant */}
-                            {(() => {
-                                const filterCount = Object.values(filters).filter(Boolean).length;
-                                const allTrue = filterCount === 6 && Object.values(filters).every(Boolean);
-                                const onlyOneTrue = filterCount === 1;
-                                const getPillStyle = (active: boolean) => {
-                                    if (allTrue) return styles.filterPillUnselected;
-                                    if (onlyOneTrue && active) return styles.filterPillSelected;
-                                    return styles.filterPillUnselected;
-                                };
-                                const getIconColor = (active: boolean) => {
-                                    if (allTrue) return '#1e3a8a';
-                                    if (onlyOneTrue && active) return '#fff';
-                                    return '#1e3a8a';
-                                };
-                                const getTextColor = getIconColor;
-                                return (
-                                    <TouchableOpacity
-                                        onPress={() => toggleFilter('restaurant')}
-                                        style={[
-                                            styles.filterPill,
-                                            getPillStyle(filters.restaurant),
-                                            null
-                                        ]}
-                                    >
-                                        <MaterialCommunityIcons name="silverware-fork-knife" size={20} color={getIconColor(filters.restaurant)} style={{ marginRight: 7 }} />
-                                        <Text style={{ color: getTextColor(filters.restaurant), fontWeight: '600', fontSize: 15 }}>Restaurant</Text>
-                                    </TouchableOpacity>
-                                );
-                            })()}
                             {/* Cafe */}
                             {(() => {
                                 const filterCount = Object.values(filters).filter(Boolean).length;
@@ -1147,11 +1421,15 @@ export default function App() {
                                     return styles.filterPillUnselected;
                                 };
                                 const getIconColor = (active: boolean) => {
+                                    if (allTrue) return '#8B4513';
+                                    if (onlyOneTrue && active) return '#fff';
+                                    return '#8B4513';
+                                };
+                                const getTextColor = (active: boolean) => {
                                     if (allTrue) return '#1e3a8a';
                                     if (onlyOneTrue && active) return '#fff';
                                     return '#1e3a8a';
                                 };
-                                const getTextColor = getIconColor;
                                 return (
                                     <TouchableOpacity
                                         onPress={() => toggleFilter('cafe')}
@@ -1177,11 +1455,15 @@ export default function App() {
                                     return styles.filterPillUnselected;
                                 };
                                 const getIconColor = (active: boolean) => {
+                                    if (allTrue) return '#CC7000';
+                                    if (onlyOneTrue && active) return '#fff';
+                                    return '#CC7000';
+                                };
+                                const getTextColor = (active: boolean) => {
                                     if (allTrue) return '#1e3a8a';
                                     if (onlyOneTrue && active) return '#fff';
                                     return '#1e3a8a';
                                 };
-                                const getTextColor = getIconColor;
                                 return (
                                     <TouchableOpacity
                                         onPress={() => toggleFilter('grocery_store')}
@@ -1196,6 +1478,40 @@ export default function App() {
                                     </TouchableOpacity>
                                 );
                             })()}
+                            {/* Restaurant */}
+                            {(() => {
+                                const filterCount = Object.values(filters).filter(Boolean).length;
+                                const allTrue = filterCount === 6 && Object.values(filters).every(Boolean);
+                                const onlyOneTrue = filterCount === 1;
+                                const getPillStyle = (active: boolean) => {
+                                    if (allTrue) return styles.filterPillUnselected;
+                                    if (onlyOneTrue && active) return styles.filterPillSelected;
+                                    return styles.filterPillUnselected;
+                                };
+                                const getIconColor = (active: boolean) => {
+                                    if (allTrue) return '#006400';
+                                    if (onlyOneTrue && active) return '#fff';
+                                    return '#006400';
+                                };
+                                const getTextColor = (active: boolean) => {
+                                    if (allTrue) return '#1e3a8a';
+                                    if (onlyOneTrue && active) return '#fff';
+                                    return '#1e3a8a';
+                                };
+                                return (
+                                    <TouchableOpacity
+                                        onPress={() => toggleFilter('restaurant')}
+                                        style={[
+                                            styles.filterPill,
+                                            getPillStyle(filters.restaurant),
+                                            null
+                                        ]}
+                                    >
+                                        <MaterialCommunityIcons name="silverware-fork-knife" size={20} color={getIconColor(filters.restaurant)} style={{ marginRight: 7 }} />
+                                        <Text style={{ color: getTextColor(filters.restaurant), fontWeight: '600', fontSize: 15 }}>Restaurant</Text>
+                                    </TouchableOpacity>
+                                );
+                            })()}
                             {/* Public Bathroom */}
                             {(() => {
                                 const filterCount = Object.values(filters).filter(Boolean).length;
@@ -1207,11 +1523,15 @@ export default function App() {
                                     return styles.filterPillUnselected;
                                 };
                                 const getIconColor = (active: boolean) => {
+                                    if (allTrue) return '#000080';
+                                    if (onlyOneTrue && active) return '#fff';
+                                    return '#000080';
+                                };
+                                const getTextColor = (active: boolean) => {
                                     if (allTrue) return '#1e3a8a';
                                     if (onlyOneTrue && active) return '#fff';
                                     return '#1e3a8a';
                                 };
-                                const getTextColor = getIconColor;
                                 return (
                                     <TouchableOpacity
                                         onPress={() => toggleFilter('public_bathroom')}
@@ -1237,11 +1557,15 @@ export default function App() {
                                     return styles.filterPillUnselected;
                                 };
                                 const getIconColor = (active: boolean) => {
+                                    if (allTrue) return '#CC0000';
+                                    if (onlyOneTrue && active) return '#fff';
+                                    return '#CC0000';
+                                };
+                                const getTextColor = (active: boolean) => {
                                     if (allTrue) return '#1e3a8a';
                                     if (onlyOneTrue && active) return '#fff';
                                     return '#1e3a8a';
                                 };
-                                const getTextColor = getIconColor;
                                 return (
                                     <TouchableOpacity
                                         onPress={() => toggleFilter('pit_stop')}
@@ -1267,11 +1591,15 @@ export default function App() {
                                     return styles.filterPillUnselected;
                                 };
                                 const getIconColor = (active: boolean) => {
+                                    if (allTrue) return '#000000';
+                                    if (onlyOneTrue && active) return '#fff';
+                                    return '#000000';
+                                };
+                                const getTextColor = (active: boolean) => {
                                     if (allTrue) return '#1e3a8a';
                                     if (onlyOneTrue && active) return '#fff';
                                     return '#1e3a8a';
                                 };
-                                const getTextColor = getIconColor;
                                 return (
                                     <TouchableOpacity
                                         onPress={() => toggleFilter('bar')}
@@ -1425,7 +1753,7 @@ export default function App() {
                         ref={bottomSheetRef}
                         index={0}
                         snapPoints={snapPoints}
-                        enablePanDownToClose={true}
+                        enablePanDownToClose={false}
                         onClose={closeDetails}
                         animatedIndex={animatedIndex}
                         style={[styles.bottomSheet]}
@@ -1451,8 +1779,8 @@ export default function App() {
                                             }
                                         }
                                         return (
-                                            <View>
-                                                <Text style={{ fontSize: 29, paddingTop: 15, fontWeight: '600', color: '#1e3a8a', textAlign: 'center' }}>
+                                            <View style={{ alignItems: 'center', justifyContent: 'center' }}>
+                                                <Text style={{ fontSize: 25, padding: 12, fontWeight: '600', color: '#1e3a8a', textAlign: 'center' }}>
                                                     {filteredPlaces.length} {label} Found
                                                 </Text>
                                             </View>
@@ -1538,101 +1866,47 @@ export default function App() {
                                 </View>
                             ) : (
                                 <>
-                                    <View
-                                        style={{
-                                            flexDirection: 'row',
-                                            justifyContent: 'center',
-                                            alignItems: 'center',
-                                            marginHorizontal: 18,
-                                            marginVertical: 21.5,
-                                            paddingBottom: 5,
-                                            gap: 10,
-                                        }}
-                                    >
-                                        {/* Walk Button */}
-                                        <TouchableOpacity
-                                            style={[
-                                                {
-                                                    paddingHorizontal: 18,
-                                                    paddingVertical: 8,
-                                                    borderRadius: 999,
-                                                    flexDirection: 'row',
-                                                    alignItems: 'center',
-                                                    borderWidth: 1,
-                                                    borderColor: themeDarkBlue,
-                                                    backgroundColor:
-                                                        travelMode === 'walking' ? themeLightBlue : 'transparent',
-                                                },
-                                            ]}
-                                            onPress={() => setTravelMode('walking')}
-                                        >
-                                            <FontAwesome5
-                                                name="walking"
-                                                size={18}
-                                                color={themeDarkBlue}
-                                                style={{ marginRight: 9 }}
-                                            />
-                                            <Text
-                                                style={{
-                                                    fontSize: 16,
-                                                    fontWeight: '600',
-                                                    color: themeDarkBlue,
-                                                }}
+                                    {/* Compact Button Row */}
+                                    <View style={{ paddingHorizontal: 8, paddingTop: 8, paddingBottom: 10, justifyContent: 'center', alignItems: 'center' }}>
+                                        <View style={styles.compactButtonRow}>
+                                            {/* Sort Dropdown */}
+                                            <View style={{ marginRight: 4 }}>
+                                                <SortDropdown sortType={sortType} setSortType={setSortType} />
+                                            </View>
+
+                                            {/* Divider */}
+                                            <View style={styles.buttonRowDivider} />
+
+                                            {/* Walk/Drive Toggle */}
+                                            <View style={styles.travelModeToggle}>
+                                                <TouchableOpacity
+                                                    style={[styles.travelModeOption, travelMode === 'walking' && { backgroundColor: themeLightBlue }]}
+                                                    onPress={() => setTravelMode('walking')}
+                                                >
+                                                    <FontAwesome5 name="walking" size={17} color={travelMode === 'walking' ? themeDarkBlue : '#666'} />
+                                                </TouchableOpacity>
+                                                <View style={styles.travelModeDivider} />
+                                                <TouchableOpacity
+                                                    style={[styles.travelModeOption, travelMode === 'driving' && { backgroundColor: themeLightBlue }]}
+                                                    onPress={() => setTravelMode('driving')}
+                                                >
+                                                    <FontAwesome5 name="car" size={17} color={travelMode === 'driving' ? themeDarkBlue : '#666'} />
+                                                </TouchableOpacity>
+                                            </View>
+
+                                            {/* Divider */}
+                                            <View style={styles.buttonRowDivider} />
+
+                                            {/* Open Now Button */}
+                                            <TouchableOpacity
+                                                style={[styles.openNowBtn, openNowOnly && styles.openNowBtnActive]}
+                                                onPress={() => setOpenNowOnly(prev => !prev)}
                                             >
-                                                Walk
-                                            </Text>
-                                        </TouchableOpacity>
-
-                                        {/* Drive Button */}
-                                        <TouchableOpacity
-                                            style={[
-                                                {
-                                                    paddingHorizontal: 15,
-                                                    paddingVertical: 8,
-                                                    borderRadius: 999,
-                                                    flexDirection: 'row',
-                                                    alignItems: 'center',
-                                                    borderWidth: 1,
-                                                    borderColor: themeDarkBlue,
-                                                    backgroundColor:
-                                                        travelMode === 'driving' ? themeLightBlue : 'transparent',
-                                                },
-                                            ]}
-                                            onPress={() => setTravelMode('driving')}
-                                        >
-                                            <FontAwesome5
-                                                name="car"
-                                                size={18}
-                                                color={themeDarkBlue}
-                                                style={{ marginRight: 9 }}
-                                            />
-                                            <Text
-                                                style={{
-                                                    fontSize: 16,
-                                                    fontWeight: '600',
-                                                    color: themeDarkBlue,
-                                                }}
-                                            >
-                                                Drive
-                                            </Text>
-                                        </TouchableOpacity>
-                                    </View>
-
-                                    <View style={[styles.filterRow, { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }]}>
-                                        <SortDropdown sortType={sortType} setSortType={setSortType} />
-                                        {/* <TravelModeDropdown travelMode={travelMode} setTravelMode={setTravelMode} /> */}
-
-                                        <TouchableOpacity
-                                            style={[
-                                                styles.openNowBtn,
-                                                openNowOnly && styles.openNowBtnActive,
-                                            ]}
-                                            onPress={() => setOpenNowOnly(prev => !prev)}
-                                        >
-                                            <Text style={openNowOnly ? styles.openNowTextActive : styles.openNowText}>
-                                                {openNowOnly ? '✓ Open Now' : 'Open Now'}
-                                            </Text>
-                                        </TouchableOpacity>
+                                                <Text style={openNowOnly ? styles.openNowTextActive : styles.openNowText}>
+                                                    {openNowOnly ? '✓ Open Now' : '  Open Now  '}
+                                                </Text>
+                                            </TouchableOpacity>
+                                        </View>
                                     </View>
 
                                     <Modal
@@ -1704,26 +1978,76 @@ const styles = StyleSheet.create({
         paddingHorizontal: 16,
         paddingBottom: 10
     },
-    openNowBtn: {
-        paddingVertical: 8,
+    compactButtonRow: {
+        flexDirection: 'row',
+        backgroundColor: '#fff',
+        borderRadius: 30,
+        overflow: 'hidden',
+        borderWidth: 1,
+        borderColor: '#e5e7eb',
+        shadowColor: '#000',
+        shadowOpacity: 0.15,
+        shadowOffset: { width: 0, height: 2 },
+        shadowRadius: 8,
+        elevation: 8,
+        alignItems: 'center',
+        paddingVertical: 12,
         paddingHorizontal: 12,
-        backgroundColor: '#f3f4f6',
-        borderRadius: 6,
+        gap: 3,
+    },
+    buttonRowDivider: {
+        width: 1,
+        height: 24,
+        backgroundColor: '#d1d5db',
+    },
+    travelModeToggle: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 3,
+    },
+    travelModeOption: {
+        width: 32,
+        height: 32,
+        marginHorizontal: 3,
+        borderRadius: 16,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    travelModeDivider: {
+        width: 1,
+        height: 24,
+        backgroundColor: '#d1d5db',
+    },
+    openNowBtn: {
+        paddingVertical: 6,
+        paddingHorizontal: 8,
+        marginLeft: 4,
+        backgroundColor: 'transparent',
+        borderRadius: 999, // pill shape
         borderWidth: 1,
         borderColor: '#1e3a8a', // Blue border
+        alignItems: 'center',
+        justifyContent: 'center',
     },
     openNowBtnActive: {
-        backgroundColor: '#1e3a8a',
+        backgroundColor: '#1e3a8a', // Dark blue PottyPal theme
+        borderColor: '#1e3a8a',
+        borderWidth: 2, // Thicker border when active
+        shadowColor: '#1e3a8a',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.3,
+        shadowRadius: 4,
+        elevation: 4,
     },
     openNowText: {
         color: '#1e3a8a',
         fontWeight: '600',
-        fontSize: 16,
+        fontSize: 12,
     },
     openNowTextActive: {
-        color: '#fff',
-        fontWeight: '600',
-        fontSize: 16,
+        color: '#fff', // White text when selected
+        fontWeight: '700',
+        fontSize: 12,
     },
     gpsButtonContainer: {
         position: 'absolute',

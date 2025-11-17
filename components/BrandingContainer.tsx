@@ -45,7 +45,7 @@ const styles = StyleSheet.create({
 
     },
     brandingText: {
-        fontSize: 24,
+        fontSize: 21,
         fontWeight: 'bold',
         color: '#1e3a8a',
         fontFamily: 'HelveticaNeue',

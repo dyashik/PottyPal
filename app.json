@@ -2,7 +2,7 @@
   "expo": {
     "name": "PottyPal",
     "slug": "PottyPal",
-    "version": "1.9.3",
+    "version": "2.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "pottypal",
@@ -16,7 +16,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.pottypal.PottyPal",
-      "buildNumber": "13",
+      "buildNumber": "14",
       "config": {
         "googleMapsApiKey": "AIzaSyA924VxnZfLnvUcqN2R9kzFqNjCRTeaIAI"
       },
@@ -53,7 +53,8 @@
       [
         "react-native-google-mobile-ads",
         {
-          "iosAppId": "ca-app-pub-3844546379677181~2775797959"
+          "iosAppId": "ca-app-pub-3844546379677181~2775797959",
+          "androidAppId": "ca-app-pub-3844546379677181~2775797959"
         }
       ],
       "expo-font"

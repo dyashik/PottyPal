@@ -4,6 +4,15 @@ require File.join(File.dirname(`node --print "require.resolve('react-native/pack
 require 'json'
 podfile_properties = JSON.parse(File.read(File.join(__dir__, 'Podfile.properties.json'))) rescue {}
 
+# Mapbox Navigation setup
+$RNMBNAV = Object.new
+def $RNMBNAV.pre_install(installer)
+  # Mapbox pre-install setup
+end
+def $RNMBNAV.post_install(installer)
+  # Mapbox post-install setup
+end
+
 ENV['RCT_NEW_ARCH_ENABLED'] = '0' if podfile_properties['newArchEnabled'] == 'false'
 ENV['EX_DEV_CLIENT_NETWORK_INSPECTOR'] = podfile_properties['EX_DEV_CLIENT_NETWORK_INSPECTOR']
 
@@ -12,6 +21,10 @@ install! 'cocoapods',
   :deterministic_uuids => false
 
 prepare_react_native_project!
+
+pre_install do |installer|
+  $RNMBNAV.pre_install(installer)
+end
 
 target 'PottyPal' do
   use_expo_modules!
@@ -32,6 +45,10 @@ target 'PottyPal' do
 # @generated begin react-native-maps - expo prebuild (DO NOT MODIFY) sync-e9cc66c360abe50bc66d89fffb3c55b034d7d369
   pod 'react-native-google-maps', path: File.dirname(`node --print "require.resolve('react-native-maps/package.json')"`)
 # @generated end react-native-maps
+  
+  # Mapbox Navigation
+  pod 'react-native-mapbox-navigation', :path => '../node_modules/@pawan-pk/react-native-mapbox-navigation'
+  
   config = use_native_modules!(config_command)
 
   use_frameworks! :linkage => podfile_properties['ios.useFrameworks'].to_sym if podfile_properties['ios.useFrameworks']
@@ -46,12 +63,80 @@ target 'PottyPal' do
   )
 
   post_install do |installer|
+    $RNMBNAV.post_install(installer)
+    
     react_native_post_install(
       installer,
       config[:reactNativePath],
       :mac_catalyst_enabled => false,
       :ccache_enabled => podfile_properties['apple.ccacheEnabled'] == 'true',
     )
+
+    installer.pods_project.targets.each do |target|
+      # Skip aggregate targets (they don't have source_build_phase / files_references)
+      next unless target.respond_to?(:source_build_phase)
+
+      # --- 1) Remove duplicate compile sources (Mapbox view manager duplicates) ---
+      begin
+        compile_phase = target.source_build_phase
+        # collect paths, keep first only
+        seen = {}
+        compile_phase.files.each do |file|
+          path = file.file_ref&.path
+          next unless path
+          if path.include?('MapboxNavigationViewManager.m') || path.include?('MapboxNavigationViewExport.m')
+            if seen[path]
+              compile_phase.remove_file_reference(file)
+            else
+              seen[path] = true
+            end
+          end
+        end
+      rescue => e
+        # be defensive — don't fail the whole post_install if something odd happens
+        puts "post_install: compile-phase cleanup skipped for #{target.name}: #{e}"
+      end
+
+      # --- 2) Remove duplicate resource file references (PrivacyInfo.xcprivacy etc.) ---
+      begin
+        target.build_phases.each do |phase|
+          next unless phase.respond_to?(:files_references)
+          # dedupe any duplicate resource entries (e.g. PrivacyInfo.xcprivacy)
+          seen_res = {}
+          phase.files_references.dup.each do |file_ref|
+            path = file_ref&.path
+            next unless path
+            if path.include?('PrivacyInfo.xcprivacy') || path.include?('PrivacyInfo.plist')
+              if seen_res[path]
+                phase.remove_file_reference(file_ref) rescue nil
+              else
+                seen_res[path] = true
+              end
+            end
+          end
+        end
+      rescue => e
+        puts "post_install: resource-phase cleanup skipped for #{target.name}: #{e}"
+      end
+
+      # --- 3) Ensure the RN shim file will be compiled if present in node_modules ---
+      # This only attempts to add file refs if the file exists in the expected place.
+      begin
+        podspec_name = installer.pod_targets.find { |pt| pt.name == target.name }&.name
+        # Look for shim inside node_modules package
+        shim_rel = "../node_modules/@pawan-pk/react-native-mapbox-navigation/ios/RNMapboxNavigationViewExport.m"
+        shim_full = File.join(installer.sandbox.root, "..", shim_rel)
+        if File.exist?(shim_full)
+          # add to target's source build phase if not already present
+          unless target.source_build_phase.files.find { |f| f.file_ref&.path&.end_with?('RNMapboxNavigationViewExport.m') }
+            file_ref = target.project.new_file(shim_full)
+            target.source_build_phase.add_file_reference(file_ref)
+          end
+        end
+      rescue => e
+        puts "post_install: shim injection skipped for #{target.name}: #{e}"
+      end
+    end
 
     # This is necessary for Xcode 14, because it signs resource bundles by default
     # when building for devices.

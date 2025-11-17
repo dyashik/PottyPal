@@ -92,18 +92,18 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         alignSelf: 'flex-start',
-        paddingVertical: 8,
-        paddingHorizontal: 12,
-        backgroundColor: '#f3f4f6',
-        borderRadius: 6,
+        paddingVertical: 6,
+        paddingHorizontal: 8,
+        backgroundColor: 'transparent',
+        borderRadius: 999, // pill shape
         borderWidth: 1,
         borderColor: '#1e3a8a', // Blue border
     },
     sortByText: {
-        fontSize: 16,
+        fontSize: 12,
         color: '#1e3a8a',
         fontWeight: '600',
-        marginRight: 6,
+        marginRight: 4,
     },
     dropdown: {
         position: 'absolute',
@@ -125,11 +125,11 @@ const styles = StyleSheet.create({
         backgroundColor: '#e5e7eb',
     },
     optionText: {
-        fontSize: 15,
+        fontSize: 12,
         color: '#111827',
     },
     selectedText: {
-        fontSize: 15,
+        fontSize: 12,
         color: '#1e3a8a',
         fontWeight: '600',
     },
