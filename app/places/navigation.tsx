@@ -156,7 +156,7 @@ export default function Navigation() {
             />
             {/* <View style={styles.adContainer}>
                 <BannerAd
-                    unitId={TestIds.BANNER}
+                    unitId="ca-app-pub-3844546379677181/4302897388"
                     size={BannerAdSize.ANCHORED_ADAPTIVE_BANNER}
                     requestOptions={{
                         requestNonPersonalizedAdsOnly: false,

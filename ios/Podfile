@@ -1,3 +1,18 @@
+# Setup Mapbox authentication FIRST - before any requires or downloads
+token = ENV['MAPBOX_DOWNLOADS_TOKEN']
+if token && !token.empty?
+  netrc_path = File.expand_path("~/.netrc")
+  File.open(netrc_path, 'w') do |file|
+    file.puts "machine api.mapbox.com"
+    file.puts "login mapbox"
+    file.puts "password #{token}"
+  end
+  File.chmod(0600, netrc_path)
+  puts "✅ Created .netrc for Mapbox authentication"
+else
+  puts "⚠️  Warning: MAPBOX_DOWNLOADS_TOKEN not set - Mapbox downloads may fail"
+end
+
 require File.join(File.dirname(`node --print "require.resolve('expo/package.json')"`), "scripts/autolinking")
 require File.join(File.dirname(`node --print "require.resolve('react-native/package.json')"`), "scripts/react_native_pods")
 
@@ -7,7 +22,7 @@ podfile_properties = JSON.parse(File.read(File.join(__dir__, 'Podfile.properties
 # Mapbox Navigation setup
 $RNMBNAV = Object.new
 def $RNMBNAV.pre_install(installer)
-  # Mapbox pre-install setup
+  # Mapbox pre-install setup (netrc is already created at top of file)
 end
 def $RNMBNAV.post_install(installer)
   # Mapbox post-install setup
@@ -59,7 +74,8 @@ target 'PottyPal' do
     :hermes_enabled => podfile_properties['expo.jsEngine'] == nil || podfile_properties['expo.jsEngine'] == 'hermes',
     # An absolute path to your application root.
     :app_path => "#{Pod::Config.instance.installation_root}/..",
-    :privacy_file_aggregation_enabled => podfile_properties['apple.privacyManifestAggregationEnabled'] != 'false',
+    # CRITICAL: Disable privacy manifest aggregation to prevent duplicate PrivacyInfo.xcprivacy
+    :privacy_file_aggregation_enabled => false,
   )
 
   post_install do |installer|
@@ -71,15 +87,68 @@ target 'PottyPal' do
       :mac_catalyst_enabled => false,
       :ccache_enabled => podfile_properties['apple.ccacheEnabled'] == 'true',
     )
-
+    
+    # CRITICAL FIX: Remove ALL PrivacyInfo.xcprivacy from Pods resources script
+    # This prevents Pods from copying their PrivacyInfo files to the app bundle
+    begin
+      resources_script = File.join(installer.sandbox.root, 'Target Support Files/Pods-PottyPal/Pods-PottyPal-resources.sh')
+      if File.exist?(resources_script)
+        contents = File.read(resources_script)
+        privacy_lines = contents.lines.select { |line| line.include?('PrivacyInfo.xcprivacy') }
+        
+        if privacy_lines.count > 0
+          puts "\n🔧 Found #{privacy_lines.count} Pod PrivacyInfo references in resources script"
+          new_contents = contents.lines.reject { |line| line.include?('PrivacyInfo.xcprivacy') }.join
+          File.write(resources_script, new_contents)
+          puts "✅ Removed all Pod PrivacyInfo.xcprivacy from copy script"
+          puts "   (Your app's PrivacyInfo.xcprivacy in PottyPal/ will still be included)\n"
+        end
+      end
+    rescue => e
+      puts "⚠️  Warning: Could not fix Pods resources script: #{e}"
+    end
+    
+    # ADDITIONAL FIX: Disable privacy manifest aggregation to prevent duplicates
+    # This tells Xcode to NOT merge privacy manifests from dependencies
     installer.pods_project.targets.each do |target|
-      # Skip aggregate targets (they don't have source_build_phase / files_references)
+      target.build_configurations.each do |config|
+        config.build_settings['GENERATE_INFOPLIST_FILE'] = 'YES'
+        # Disable privacy file aggregation for pod targets
+        config.build_settings['ENABLE_USER_SCRIPT_SANDBOXING'] = 'NO'
+      end
+    end
+    
+    # Set the main app target to disable privacy manifest aggregation
+    begin
+      project_path = File.join(File.dirname(__FILE__), 'PottyPal.xcodeproj')
+      if File.exist?(project_path)
+        require 'xcodeproj'
+        app_project = Xcodeproj::Project.open(project_path)
+        
+        app_project.targets.each do |target|
+          if target.name == 'PottyPal'
+            target.build_configurations.each do |config|
+              # Disable automatic privacy manifest aggregation
+              config.build_settings['APPLY_RULES_IN_COPY_FILES'] = 'NO'
+              config.build_settings['EXCLUDED_ARCHS[sdk=iphonesimulator*]'] = 'arm64' if config.name == 'Debug'
+            end
+            puts "✅ Updated build settings for #{target.name}"
+          end
+        end
+        
+        app_project.save
+      end
+    rescue => e
+      puts "⚠️  Could not update app build settings: #{e}"
+    end
+
+    # --- Mapbox shim file fix ---
+    installer.pods_project.targets.each do |target|
       next unless target.respond_to?(:source_build_phase)
 
-      # --- 1) Remove duplicate compile sources (Mapbox view manager duplicates) ---
+      # Remove duplicate Mapbox view manager compile sources
       begin
         compile_phase = target.source_build_phase
-        # collect paths, keep first only
         seen = {}
         compile_phase.files.each do |file|
           path = file.file_ref&.path
@@ -93,53 +162,25 @@ target 'PottyPal' do
           end
         end
       rescue => e
-        # be defensive — don't fail the whole post_install if something odd happens
-        puts "post_install: compile-phase cleanup skipped for #{target.name}: #{e}"
+        puts "Mapbox compile-phase cleanup skipped for #{target.name}: #{e}"
       end
 
-      # --- 2) Remove duplicate resource file references (PrivacyInfo.xcprivacy etc.) ---
+      # Ensure RN Mapbox shim file is included
       begin
-        target.build_phases.each do |phase|
-          next unless phase.respond_to?(:files_references)
-          # dedupe any duplicate resource entries (e.g. PrivacyInfo.xcprivacy)
-          seen_res = {}
-          phase.files_references.dup.each do |file_ref|
-            path = file_ref&.path
-            next unless path
-            if path.include?('PrivacyInfo.xcprivacy') || path.include?('PrivacyInfo.plist')
-              if seen_res[path]
-                phase.remove_file_reference(file_ref) rescue nil
-              else
-                seen_res[path] = true
-              end
-            end
-          end
-        end
-      rescue => e
-        puts "post_install: resource-phase cleanup skipped for #{target.name}: #{e}"
-      end
-
-      # --- 3) Ensure the RN shim file will be compiled if present in node_modules ---
-      # This only attempts to add file refs if the file exists in the expected place.
-      begin
-        podspec_name = installer.pod_targets.find { |pt| pt.name == target.name }&.name
-        # Look for shim inside node_modules package
         shim_rel = "../node_modules/@pawan-pk/react-native-mapbox-navigation/ios/RNMapboxNavigationViewExport.m"
         shim_full = File.join(installer.sandbox.root, "..", shim_rel)
         if File.exist?(shim_full)
-          # add to target's source build phase if not already present
           unless target.source_build_phase.files.find { |f| f.file_ref&.path&.end_with?('RNMapboxNavigationViewExport.m') }
             file_ref = target.project.new_file(shim_full)
             target.source_build_phase.add_file_reference(file_ref)
           end
         end
       rescue => e
-        puts "post_install: shim injection skipped for #{target.name}: #{e}"
+        puts "Mapbox shim injection skipped for #{target.name}: #{e}"
       end
     end
 
-    # This is necessary for Xcode 14, because it signs resource bundles by default
-    # when building for devices.
+    # Fix for resource bundles (Xcode 14+)
     installer.target_installation_results.pod_target_installation_results
       .each do |pod_name, target_installation_result|
       target_installation_result.resource_bundle_targets.each do |resource_bundle_target|
@@ -148,5 +189,52 @@ target 'PottyPal' do
         end
       end
     end
+    
+    # CRITICAL FIX: Remove CFBundleExecutable from boost_privacy resource bundle
+    # App Store validation fails if resource bundles have CFBundleExecutable but no executable
+    begin
+      puts "\n🔧 Fixing boost_privacy.bundle Info.plist..."
+      
+      # Fix the boost privacy bundle template that gets copied during build
+      boost_privacy_plist = File.join(installer.sandbox.root, 'Target Support Files/boost/ResourceBundle-boost_privacy-boost-Info.plist')
+      
+      if File.exist?(boost_privacy_plist)
+        # Remove CFBundleExecutable if it exists
+        system("/usr/libexec/PlistBuddy -c 'Delete :CFBundleExecutable' '#{boost_privacy_plist}' 2>/dev/null")
+        
+        # Ensure CFBundlePackageType is BNDL
+        system("/usr/libexec/PlistBuddy -c 'Set :CFBundlePackageType BNDL' '#{boost_privacy_plist}' 2>/dev/null")
+        
+        puts "  ✅ Fixed boost_privacy bundle Info.plist template"
+      end
+      
+      # Also add a build phase script to fix any .bundle files in the built app
+      installer.pods_project.targets.each do |target|
+        if target.name == 'Pods-PottyPal'
+          # Add a script phase to remove CFBundleExecutable from all bundles at build time
+          script_phase = target.new_shell_script_build_phase('Fix Resource Bundle Info.plist')
+          script_phase.shell_script = <<~SCRIPT
+            # Remove CFBundleExecutable from all resource bundles
+            find "${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}" -name "*.bundle" -type d | while read bundle; do
+              plist="${bundle}/Info.plist"
+              if [ -f "${plist}" ]; then
+                /usr/libexec/PlistBuddy -c "Delete :CFBundleExecutable" "${plist}" 2>/dev/null || true
+                /usr/libexec/PlistBuddy -c "Set :CFBundlePackageType BNDL" "${plist}" 2>/dev/null || true
+              fi
+            done
+          SCRIPT
+          
+          puts "  ✅ Added build phase to fix bundle Info.plist files at build time"
+          break
+        end
+      end
+      
+      puts "✅ Resource bundle fixes applied\n"
+    rescue => e
+      puts "⚠️  Warning: Could not fix resource bundles: #{e}"
+    end
+    
+    # Save changes to the pods project
+    installer.pods_project.save
   end
 end

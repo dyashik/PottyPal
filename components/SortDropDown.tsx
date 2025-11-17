@@ -100,7 +100,7 @@ const styles = StyleSheet.create({
         borderColor: '#1e3a8a', // Blue border
     },
     sortByText: {
-        fontSize: 12,
+        fontSize: 13,
         color: '#1e3a8a',
         fontWeight: '600',
         marginRight: 4,

@@ -9,7 +9,7 @@ import { AntDesign, Feather, FontAwesome5, Ionicons, MaterialCommunityIcons, Mat
 import MapView, { Callout, Marker, Polyline } from 'react-native-maps';
 import getGoogleMapsApiKey from '@/config/getGoogleMapsKey';
 import CustomCallout from '@/components/CustomCallout';
-import { BannerAd, BannerAdSize, TestIds } from 'react-native-google-mobile-ads';
+import { BannerAd, BannerAdSize } from 'react-native-google-mobile-ads';
 
 function formatType(type?: string) {
     if (!type) return '';
@@ -336,12 +336,25 @@ export default function PlaceDetails() {
                     <TouchableOpacity
                         style={styles.actionBtn}
                         onPress={() => {
-                            openGoogleMaps(place.googleMapsLinks?.directionsUri!);
+                            router.push({
+                                pathname: '/places/fullScreenMap',
+                                params: {
+                                    id: id,
+                                    lat: place.location.latitude.toString(),
+                                    lng: place.location.longitude.toString(),
+                                    name: place.displayName?.text ?? '',
+                                    type: place.primaryType ?? '',
+                                    walkingURL: place.googleMapsLinks?.directionsUri,
+                                    walkingTime: place.distanceInfo?.walking?.duration ?? '',
+                                    travelMode: travelMode,
+                                    distanceInfo: JSON.stringify(place.distanceInfo),
+                                }
+                            });
                         }}
                     >
                         <View style={styles.iconTextRow}>
                             <FontAwesome5 name="directions" size={15} color="white" />
-                            <Text style={styles.actionText}>Google Maps</Text>
+                            <Text style={styles.actionText}>Directions</Text>
                         </View>
                     </TouchableOpacity>
                     {place.googleMapsLinks?.directionsUri && (
@@ -445,7 +458,7 @@ export default function PlaceDetails() {
 
                 <View style={{ marginBottom: 20 }}>
                     <BannerAd
-                        unitId={TestIds.BANNER}
+                        unitId="ca-app-pub-3844546379677181/4302897388"
                         size={BannerAdSize.ANCHORED_ADAPTIVE_BANNER}
                         requestOptions={{
                             requestNonPersonalizedAdsOnly: false,
@@ -569,7 +582,7 @@ const styles = StyleSheet.create({
         alignSelf: 'center',
     },
     placeName: {
-        fontSize: normalize(34),
+        fontSize: normalize(28),
         fontWeight: 'bold',
         color: '#1e3a8a',
         alignSelf: 'center',
@@ -577,33 +590,33 @@ const styles = StyleSheet.create({
         marginBottom: normalize(8),
     },
     address: {
-        fontSize: normalize(18),
+        fontSize: normalize(15),
         marginVertical: normalize(6),
         color: 'black',
         textAlign: 'center',
     },
     typeText: {
-        fontSize: normalize(18),
+        fontSize: normalize(16),
         color: '#4b5563',
         textAlign: 'center',
         marginVertical: 8,
     },
     actionBtn: {
         backgroundColor: '#1e3a8a',
-        paddingVertical: 12,
-        paddingHorizontal: 16, // enough space around icon/text
+        paddingVertical: 8,
+        paddingHorizontal: 18, // enough space around icon/text
         marginHorizontal: 4,
         borderRadius: 24,
         alignItems: 'center',
         justifyContent: 'center',
         height: 48,
-        minHeight: 44, // ensure minimum height for touch targets
-        maxHeight: 44,
+        minHeight: 39, // ensure minimum height for touch targets
+        maxHeight: 39,
         alignSelf: 'flex-start', // so it only grows as needed
 
     },
     actionText: {
-        fontSize: normalize(14),
+        fontSize: normalize(12),
         color: '#fff',
         fontWeight: '600',
     },
@@ -654,7 +667,7 @@ const styles = StyleSheet.create({
         marginHorizontal: 20,
     },
     meta: {
-        fontSize: 17,
+        fontSize: 15,
         color: '#374151',
         fontWeight: '500',
     },
@@ -677,14 +690,14 @@ const styles = StyleSheet.create({
         marginBottom: 12,
     },
     aboutTitle: {
-        fontSize: 20,
+        fontSize: 19,
         fontWeight: 'bold',
         color: '#1e3a8a',
         marginBottom: 10,
         alignSelf: 'center',
     },
     aboutText: {
-        fontSize: 16,
+        fontSize: 15,
         color: '#333',
         lineHeight: 28,
     },

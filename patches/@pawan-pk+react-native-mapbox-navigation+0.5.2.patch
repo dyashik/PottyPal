@@ -1,11 +1,128 @@
+diff --git a/node_modules/@pawan-pk/react-native-mapbox-navigation/ios/MapboxNavigationView.swift b/node_modules/@pawan-pk/react-native-mapbox-navigation/ios/MapboxNavigationView.swift
+index 05c943f..05676b4 100644
+--- a/node_modules/@pawan-pk/react-native-mapbox-navigation/ios/MapboxNavigationView.swift
++++ b/node_modules/@pawan-pk/react-native-mapbox-navigation/ios/MapboxNavigationView.swift
+@@ -62,6 +62,7 @@ public class MapboxNavigationView: UIView, NavigationViewControllerDelegate {
+     @objc var distanceUnit: NSString = "imperial"
+     @objc var language: NSString = "us"
+     @objc var destinationTitle: NSString = "Destination"
++    @objc var travelMode: NSString = "driving-traffic"
+ 
+     @objc var onLocationChange: RCTDirectEventBlock?
+     @objc var onRouteProgressChange: RCTDirectEventBlock?
+@@ -117,7 +118,22 @@ public class MapboxNavigationView: UIView, NavigationViewControllerDelegate {
+         let destinationWaypoint = Waypoint(coordinate: CLLocationCoordinate2D(latitude: destination[1] as! CLLocationDegrees, longitude: destination[0] as! CLLocationDegrees), name: destinationTitle as String)
+         waypointsArray.append(destinationWaypoint)
+ 
+-        let options = NavigationRouteOptions(waypoints: waypointsArray, profileIdentifier: .automobileAvoidingTraffic)
++        // Determine profile identifier based on travelMode prop
++        let profileIdentifier: MBDirectionsProfileIdentifier
++        switch travelMode as String {
++        case "walking":
++            profileIdentifier = .walking
++        case "cycling":
++            profileIdentifier = .cycling
++        case "driving":
++            profileIdentifier = .automobile
++        case "driving-traffic":
++            profileIdentifier = .automobileAvoidingTraffic
++        default:
++            profileIdentifier = .automobileAvoidingTraffic
++        }
++
++        let options = NavigationRouteOptions(waypoints: waypointsArray, profileIdentifier: profileIdentifier)
+ 
+         let locale = self.language.replacingOccurrences(of: "-", with: "_")
+         options.locale = Locale(identifier: locale)
+diff --git a/node_modules/@pawan-pk/react-native-mapbox-navigation/ios/MapboxNavigationViewManager.m b/node_modules/@pawan-pk/react-native-mapbox-navigation/ios/MapboxNavigationViewManager.m
+index 4ea4beb..1e369ca 100644
+--- a/node_modules/@pawan-pk/react-native-mapbox-navigation/ios/MapboxNavigationViewManager.m
++++ b/node_modules/@pawan-pk/react-native-mapbox-navigation/ios/MapboxNavigationViewManager.m
+@@ -30,5 +30,6 @@ RCT_EXPORT_VIEW_PROPERTY(showCancelButton, BOOL)
+ RCT_EXPORT_VIEW_PROPERTY(language, NSString)
+ RCT_EXPORT_VIEW_PROPERTY(distanceUnit, NSString)
+ RCT_EXPORT_VIEW_PROPERTY(mute, BOOL)
++RCT_EXPORT_VIEW_PROPERTY(travelMode, NSString)
+ 
+ @end
 diff --git a/node_modules/@pawan-pk/react-native-mapbox-navigation/lib/module/MapboxNavigationViewNativeComponent.mjs b/node_modules/@pawan-pk/react-native-mapbox-navigation/lib/module/MapboxNavigationViewNativeComponent.mjs
-index e4c1ecb..1c0d05f 100644
+index e4c1ecb..cb38d76 100644
 --- a/node_modules/@pawan-pk/react-native-mapbox-navigation/lib/module/MapboxNavigationViewNativeComponent.mjs
 +++ b/node_modules/@pawan-pk/react-native-mapbox-navigation/lib/module/MapboxNavigationViewNativeComponent.mjs
 @@ -1,3 +1,3 @@
 -import codegenNativeComponent from 'react-native/Libraries/Utilities/codegenNativeComponent';
 -export default codegenNativeComponent('MapboxNavigationView');
 +import { requireNativeComponent } from 'react-native';
-+export default requireNativeComponent('MapboxNavigationViewManager');
++export default requireNativeComponent('MapboxNavigationView');
  //# sourceMappingURL=MapboxNavigationViewNativeComponent.mjs.map
 \ No newline at end of file
+diff --git a/node_modules/@pawan-pk/react-native-mapbox-navigation/src/MapboxNavigation.tsx b/node_modules/@pawan-pk/react-native-mapbox-navigation/src/MapboxNavigation.tsx
+index e3d3f19..38e2efa 100644
+--- a/node_modules/@pawan-pk/react-native-mapbox-navigation/src/MapboxNavigation.tsx
++++ b/node_modules/@pawan-pk/react-native-mapbox-navigation/src/MapboxNavigation.tsx
+@@ -19,9 +19,9 @@ import MapboxNavigationView from './MapboxNavigationViewNativeComponent';
+ const permissions: Array<Permission> =
+   Platform.OS === 'android' && Platform.Version >= 33
+     ? [
+-        'android.permission.ACCESS_FINE_LOCATION',
+-        'android.permission.POST_NOTIFICATIONS',
+-      ]
++      'android.permission.ACCESS_FINE_LOCATION',
++      'android.permission.POST_NOTIFICATIONS',
++    ]
+     : ['android.permission.ACCESS_FINE_LOCATION'];
+ 
+ type MapboxNavigationState = {
+@@ -66,7 +66,7 @@ class MapboxNavigation extends React.Component<
+       if (
+         permissions.length > 1 &&
+         result[permissions[1] as ResultKey] !==
+-          PermissionsAndroid.RESULTS.GRANTED
++        PermissionsAndroid.RESULTS.GRANTED
+       ) {
+         const errorMessage = 'Notification permission is not granted.';
+         console.warn(errorMessage);
+@@ -101,6 +101,7 @@ class MapboxNavigation extends React.Component<
+       destination,
+       style,
+       distanceUnit = 'imperial',
++      travelMode = 'driving-traffic',
+       onArrive,
+       onLocationChange,
+       onRouteProgressChange,
+@@ -114,6 +115,7 @@ class MapboxNavigation extends React.Component<
+         <MapboxNavigationView
+           style={styles.mapbox}
+           distanceUnit={distanceUnit}
++          travelMode={travelMode}
+           startOrigin={[startOrigin.longitude, startOrigin.latitude]}
+           destinationTitle={destination.title}
+           destination={[destination.longitude, destination.latitude]}
+diff --git a/node_modules/@pawan-pk/react-native-mapbox-navigation/src/MapboxNavigationViewNativeComponent.ts b/node_modules/@pawan-pk/react-native-mapbox-navigation/src/MapboxNavigationViewNativeComponent.ts
+index 14196df..7782fb4 100644
+--- a/node_modules/@pawan-pk/react-native-mapbox-navigation/src/MapboxNavigationViewNativeComponent.ts
++++ b/node_modules/@pawan-pk/react-native-mapbox-navigation/src/MapboxNavigationViewNativeComponent.ts
+@@ -9,6 +9,7 @@ interface NativeProps extends ViewProps {
+   mute?: boolean;
+   separateLegs?: boolean;
+   distanceUnit?: string;
++  travelMode?: string;
+   startOrigin: NativeCoordinate;
+   waypoints?: {
+     latitude: Double;
+diff --git a/node_modules/@pawan-pk/react-native-mapbox-navigation/src/types.ts b/node_modules/@pawan-pk/react-native-mapbox-navigation/src/types.ts
+index fb4a88f..a5e5f41 100644
+--- a/node_modules/@pawan-pk/react-native-mapbox-navigation/src/types.ts
++++ b/node_modules/@pawan-pk/react-native-mapbox-navigation/src/types.ts
+@@ -69,6 +69,11 @@ export interface MapboxNavigationProps {
+   destination: Coordinate & { title?: string };
+   language?: Language;
+   distanceUnit?: 'metric' | 'imperial';
++  /**
++   * Specifies the mode of travel to be used for navigation
++   * @Default 'driving-traffic'
++   */
++  travelMode?: 'driving' | 'driving-traffic' | 'walking' | 'cycling';
+   /**
+    * [iOS only]
+    * @Default false

@@ -1,7 +1,7 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import MapView, { Marker, Polyline } from 'react-native-maps';
 import { View, StyleSheet, TouchableOpacity, Text, FlatList, Dimensions, Animated, Pressable, Linking } from 'react-native';
-import { FontAwesome5, Ionicons } from '@expo/vector-icons';
+import { AntDesign, FontAwesome5, Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import getGoogleMapsKey from '@/config/getGoogleMapsKey';
@@ -11,7 +11,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Place } from '@/utils/api';
 import BrandingContainer from '@/components/BrandingContainer';
 import CustomCallout from '@/components/CustomCallout';
-import { BannerAd, BannerAdSize, TestIds, InterstitialAd, AdEventType } from 'react-native-google-mobile-ads';
+import { BannerAd, BannerAdSize, InterstitialAd, AdEventType } from 'react-native-google-mobile-ads';
 
 type LatLng = { latitude: number; longitude: number };
 
@@ -42,6 +42,7 @@ export default function FullscreenMap() {
     const [expanded, setExpanded] = useState(false);
     const bottomSheetRef = useRef<BottomSheet>(null);
     const [interstitialLoaded, setInterstitialLoaded] = useState(false);
+    const [routeDistance, setRouteDistance] = useState<number>(0); // Distance in meters
 
     // Snap points for bottom sheet - collapsed & expanded
     const snapPoints = useMemo(() => {
@@ -163,6 +164,10 @@ export default function FullscreenMap() {
                 const route = points.map(([latitude, longitude]: [number, number]) => ({ latitude, longitude }));
                 setRouteCoords(route);
 
+                // Get distance from the route data
+                const distanceInMeters = data.routes[0].legs[0].distance.value;
+                setRouteDistance(distanceInMeters);
+
                 let rawSteps = data.routes[0].legs[0].steps;
                 let processedSteps: any[] = [];
 
@@ -214,6 +219,45 @@ export default function FullscreenMap() {
     // Helper to strip HTML from instructions
     const stripHtml = (html: string) => html.replace(/<[^>]+>/g, '');
 
+    // Calculate dynamic polyline styling based on distance and travel mode
+    const getPolylineStyle = () => {
+        // Distance ranges (in meters)
+        // < 500m: Very close - thin, subtle
+        // 500m - 2km: Close - medium
+        // 2km - 5km: Medium distance - thicker
+        // > 5km: Far - thickest, more pronounced
+
+        let strokeWidth = 4;
+        let dashPattern: number[] = [15, 10];
+
+        // Walking mode: PottyPal blue
+        // Driving mode: Dark green
+        const isWalking = mode === 'walking';
+        const strokeColor = isWalking ? '#1e3a8a' : '#15803d'; // PottyPal blue / Dark green
+
+        if (routeDistance < 500) {
+            // Very close: thin, more dotted
+            strokeWidth = 3;
+            dashPattern = [10, 8];
+        } else if (routeDistance < 2000) {
+            // Close: normal
+            strokeWidth = 4;
+            dashPattern = [15, 10];
+        } else if (routeDistance < 5000) {
+            // Medium distance: thicker, less dotted
+            strokeWidth = 5;
+            dashPattern = [20, 8];
+        } else {
+            // Far: thickest, solid-ish
+            strokeWidth = 6;
+            dashPattern = [25, 6];
+        }
+
+        return { strokeWidth, dashPattern, strokeColor };
+    };
+
+    const polylineStyle = getPolylineStyle();
+
     return (
         <View style={{ flex: 1 }}>
             {/* Back Button */}
@@ -248,14 +292,16 @@ export default function FullscreenMap() {
                     <CustomCallout place={{ displayName: { text: name as string }, primaryType: type as string, location: { latitude: latNum, longitude: lngNum } }} />
                 </Marker>
 
-                {/* Route Polyline with dashed line */}
-                <Polyline
-                    coordinates={routeCoords}
-                    strokeColor="#1e3a8a"
-                    strokeWidth={4}
-                    lineDashPattern={[15, 10]} // Dotted walking style
-                    geodesic
-                />
+                {/* Route Polyline */}
+                {routeCoords.length > 0 && (
+                    <Polyline
+                        coordinates={routeCoords}
+                        strokeColor={polylineStyle.strokeColor}
+                        strokeWidth={polylineStyle.strokeWidth}
+                        lineDashPattern={polylineStyle.dashPattern}
+                        geodesic
+                    />
+                )}
             </MapView>
 
             {/* Combined Go Button with Walk/Drive Toggle */}
@@ -349,7 +395,7 @@ export default function FullscreenMap() {
             </Pressable>
             <View>
                 <BannerAd
-                    unitId={TestIds.BANNER}
+                    unitId="ca-app-pub-3844546379677181/4302897388"
                     size={BannerAdSize.ANCHORED_ADAPTIVE_BANNER}
                     requestOptions={{
                         requestNonPersonalizedAdsOnly: false,

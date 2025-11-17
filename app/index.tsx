@@ -42,7 +42,7 @@ export default function App() {
 
     // Cache for storing fetched places by location
     const placesCache = useRef<Map<string, { places: Place[], timestamp: number }>>(new Map());
-    const CACHE_DURATION = 12 * 60 * 60 * 1000; // 12 hours in milliseconds    
+    const CACHE_DURATION = 21 * 24 * 60 * 60 * 1000; // 3 weeks in milliseconds    
     const CACHE_DISTANCE_THRESHOLD = 100; // meters - if within this distance, use cache
 
     const refreshAnim = useSharedValue(0);
@@ -218,71 +218,32 @@ export default function App() {
 
         const filter = type.toLowerCase();
 
+        // Grocery stores
         const groceryTypes = ['grocery_store', 'supermarket', 'market', 'convenience_store', 'liquor_store'];
+        if (groceryTypes.includes(filter)) return 'grocery_store';
 
-        const cafeTypes = ['cafe', 'coffee_shop', 'cat_cafe', 'dog_cafe', 'tea_house', 'bagel_shop', 'juice_shop', 'candy_store', 'chocolate_shop', 'dessert_shop', 'juice_shop', 'bakery', 'ice_cream_shop'];
-
-        const restaurantConditions =
-            filter.endsWith('_restaurant') ||
-            filter.endsWith('dessert_restaurant') ||
-            filter.endsWith('dessert_cafe') ||
-            filter.endsWith('sandwich_shop') ||
-            filter.startsWith('meal') ||
-            [
-                'restaurant',
-                'bar',
-                'bar_and_grill',
-                'pub',
-                'wine_bar',
-                'food_court',
-                'fine_dining_restaurant',
-                'buffet_restaurant',
-                'fast_food_restaurant',
-                'diner',
-                'cafeteria',
-                'brunch_restaurant',
-                'breakfast_restaurant',
-                'barbecue_restaurant',
-                'steak_house',
-                'pizzeria',
-                'pizza_restaurant',
-                'seafood_restaurant',
-                'asian_restaurant',
-                'american_restaurant',
-                'indian_restaurant',
-                'chinese_restaurant',
-                'italian_restaurant',
-                'mexican_restaurant',
-                'japanese_restaurant',
-                'thai_restaurant',
-                'korean_restaurant',
-                'lebanese_restaurant',
-                'mediterranean_restaurant',
-                'brazilian_restaurant',
-                'afghani_restaurant',
-                'african_restaurant',
-                'french_restaurant',
-                'greek_restaurant',
-                'hamburger_restaurant',
-                'ramen_restaurant',
-                'sushi_restaurant',
-                'vegetarian_restaurant',
-                'vegan_restaurant',
-                'turkish_restaurant',
-                'vietnamese_restaurant',
-                'spanish_restaurant',
-                'dessert_restaurant',
-                'buffet_restaurant'
-            ].includes(filter);
-
-        const publicBathroomTypes = ['public_bathroom', 'restroom', 'toilet', 'washroom', 'bathroom'];
-
-        if (groceryTypes.includes(filter) || ['supermarket', 'market'].includes(filter)) return 'grocery_store';
+        // Cafes and coffee shops
+        const cafeTypes = ['cafe', 'coffee_shop', 'cat_cafe', 'dog_cafe', 'tea_house', 'bagel_shop',
+            'juice_shop', 'candy_store', 'chocolate_shop', 'dessert_shop', 'bakery', 'ice_cream_shop'];
         if (cafeTypes.includes(filter)) return 'cafe';
+
+        // Gas stations and rest stops
         if (['gas_station', 'rest_stop'].includes(filter)) return 'pit_stop';
+
+        // Bars (standalone)
         if (filter === 'bar') return 'bar';
-        if (restaurantConditions) return 'restaurant';
+
+        // Public bathrooms
+        const publicBathroomTypes = ['public_bathroom', 'restroom', 'toilet', 'washroom', 'bathroom'];
         if (publicBathroomTypes.includes(filter)) return 'public_bathroom';
+
+        // Restaurants - catch anything with "restaurant" in the name, plus related food places
+        if (filter.includes('restaurant') ||
+            filter.startsWith('meal') ||
+            ['bar_and_grill', 'pub', 'wine_bar', 'food_court', 'diner', 'cafeteria',
+                'steak_house', 'pizzeria', 'sandwich_shop'].includes(filter)) {
+            return 'restaurant';
+        }
 
         return null;
     }
@@ -290,7 +251,8 @@ export default function App() {
     const filteredPlaces = places.filter(place => {
         const category = mapToFilterCategory(place.primaryType);
         if (!category) return false;
-        return filters[category] && (!openNowOnly || place.currentOpeningHours?.openNow);
+        // When openNowOnly is true, show places that are open OR have no hours info
+        return filters[category] && (!openNowOnly || !place.currentOpeningHours || place.currentOpeningHours.openNow);
     });
 
     useEffect(() => {
@@ -302,13 +264,13 @@ export default function App() {
 
     const snapPoints = useMemo(() => {
         const { height } = Dimensions.get('window');
-        const availableHeight = height - insets.top - insets.bottom;
+        const availableHeight = height;
 
         // Calculate responsive percentages based on screen size
         // iPhone 13 Pro has ~844px height, so 31% ≈ 262px and 12.5% ≈ 106px, 50% ≈ 422px, 55% ≈ 464px
         const collapsedHeight = Math.max(100, availableHeight * 0.05); // minimum 100px
         const midHeight = Math.max(300, availableHeight * 0.40);         // minimum 300px - 55% for list view (increased from 50%)
-        const selectedHeight = Math.max(280, availableHeight * 0.33);   // minimum 280px - 38% for selected place (increased from 31%)
+        const selectedHeight = Math.max(280, availableHeight * 0.32);   // minimum 280px - 38% for selected place (increased from 31%)
         const expandedHeight = Math.max(400, availableHeight * 0.70);   // minimum 400px
 
         // Convert back to percentages of total screen height
@@ -320,7 +282,15 @@ export default function App() {
         return selectedPlace ? [`${selectedPercent}%`] : [`${collapsedPercent}%`, `${midPercent}%`, `${expandedPercent}%`];
     }, [selectedPlace, insets]);
 
+    useEffect(() => {
+        if (selectedPlace) {
+            console.log('Snapping to index 0 for selected place: ' + (selectedPlace.displayName?.text ?? 'Unnamed Place') + ' | Snap Point: ' + snapPoints[0]);
+            console.log('Snap Points Array:', snapPoints);
+            // update bottomsheetref with new snapPoint
 
+            bottomSheetRef.current?.snapToPosition(snapPoints[0]);
+        }
+    }, [selectedPlace, snapPoints]);
 
     useEffect(() => {
         (async () => {
@@ -375,8 +345,20 @@ export default function App() {
 
                 // Open bottom sheet to 50% (index 1) to show the list
                 setTimeout(() => {
-                    bottomSheetRef.current?.snapToIndex(2);
-                }, 500);
+                    const currentFilteredCount = results.filter(place => {
+                        const category = mapToFilterCategory(place.primaryType);
+                        if (!category) return false;
+                        return filters[category] && (!openNowOnly || !place.currentOpeningHours || place.currentOpeningHours.openNow);
+                    }).length;
+                    console.log('Number of filtered places:', currentFilteredCount);
+                    if (currentFilteredCount > 1) {
+                        console.log('Snapping to index 1 for initial load with multiple places | Snap Point: ' + snapPoints[1]);
+                        bottomSheetRef.current?.snapToIndex(1);
+                    } else {
+                        bottomSheetRef.current?.snapToIndex(2);
+                        console.log('Snapping to index 2 for initial load with single place | Snap Point: ' + snapPoints[2]);
+                    }
+                }, 400);
             }
         })();
 
@@ -959,6 +941,10 @@ export default function App() {
             bar: true,
             pit_stop: true,
         });
+        // Clear "Open Now" filter
+        setOpenNowOnly(false);
+        // Reset sort to distance
+        setSortType('distance');
         // Clear checked areas so user can search again
         checkedAreasRef.current = [];
         // Remove all places from the list
@@ -972,8 +958,10 @@ export default function App() {
         const widthInMeters = regionToFetch.longitudeDelta * metersPerDegreeLongitude;
         const radius = widthInMeters / 1.75;
         setIsLoading(true);
+        let fetchedResults: Place[] = [];
         try {
             const results = await fetchNearbyPlaces(regionToFetch.latitude, regionToFetch.longitude, radius);
+            fetchedResults = results;
             setPlaces(results);
         } finally {
             setIsLoading(false);
@@ -989,8 +977,20 @@ export default function App() {
 
 
             setTimeout(() => {
-                bottomSheetRef.current?.snapToIndex(2);
-            }, 500);
+                const currentFilteredCount = fetchedResults.filter(place => {
+                    const category = mapToFilterCategory(place.primaryType);
+                    if (!category) return false;
+                    return filters[category] && (!openNowOnly || !place.currentOpeningHours || place.currentOpeningHours.openNow);
+                }).length;
+                console.log('Refresh - Number of filtered places:', currentFilteredCount);
+                if (currentFilteredCount > 1) {
+                    console.log('Snapping to index 1 for refresh with multiple places');
+                    bottomSheetRef.current?.snapToIndex(1);
+                } else {
+                    console.log('Snapping to index 2 for refresh with single place');
+                    bottomSheetRef.current?.snapToIndex(2);
+                }
+            }, 400);
         }
     };
 
@@ -1008,6 +1008,11 @@ export default function App() {
             setIsLoading(false);
             return;
         }
+        if (selectedPlace) {
+            setSelectedPlace(null);
+            bottomSheetRef.current?.snapToIndex(1);
+        }
+
 
         // Store region at the time of function call
         const currentRegion = { ...region };
@@ -1129,13 +1134,16 @@ export default function App() {
     // Marker press: select the place and snap bottom sheet to 50%
     const onMarkerPress = (place: Place) => {
 
-        // Use immediate timeout to break out of potential batching
+        console.log('Selected Place: ' + (place.displayName?.text ?? 'Unnamed Place'));
+        console.log('Marker pressed for place:', mapToFilterCategory(place.primaryType));
+        console.log('Place location: ' + JSON.stringify(place.location));
         setTimeout(() => {
             setSelectedPlace(place);
-        }, 0);
-
-        bottomSheetRef.current?.snapToIndex(0);
-
+            console.log('snapPoints array:', snapPoints);
+            const snapIndex = 0;
+            console.log(`Snapping to index ${snapIndex}: ${snapPoints[snapIndex] ?? 'N/A'}`);
+            bottomSheetRef.current?.snapToPosition(snapPoints[snapIndex]);
+        }, 30);
 
         // Zoom and center map on marker location
         if (place.location) {
@@ -1243,9 +1251,13 @@ export default function App() {
                         </Text>
                     </View>
 
-                    {item.rating != null && (
+                    {item.rating != null ? (
                         <Text style={styles.placeRating}>
                             ⭐ {item.rating.toFixed(1)} ({item.userRatingCount ?? 0} reviews)
+                        </Text>
+                    ) : (
+                        <Text style={[styles.placeRating]}>
+                            ⭐ 0.0 (No reviews)
                         </Text>
                     )}
 
@@ -1267,14 +1279,25 @@ export default function App() {
                         </Text>
                     </View>
 
-                    <Text
-                        style={[
-                            styles.placeOpenStatus,
-                            { color: item.primaryType === 'public_bathroom' || item.currentOpeningHours?.openNow ? '#059669' : '#dc2626' },
-                        ]}
-                    >
-                        {item.currentOpeningHours?.openNow ? 'Open Now' : 'Closed'}
-                    </Text>
+                    {item.currentOpeningHours ? (
+                        <Text
+                            style={[
+                                styles.placeOpenStatus,
+                                { color: item.currentOpeningHours.openNow ? '#059669' : '#dc2626' },
+                            ]}
+                        >
+                            {item.currentOpeningHours.openNow ? 'Open Now' : 'Closed'}
+                        </Text>
+                    ) : (
+                        <Text
+                            style={[
+                                styles.placeOpenStatus,
+                                { color: '#6b7280' },
+                            ]}
+                        >
+                            No hours found
+                        </Text>
+                    )}
                 </TouchableOpacity>
 
                 {/* Right: Individual Rounded Buttons with Spacing */}
@@ -1380,8 +1403,11 @@ export default function App() {
                                     tracksViewChanges={false}
                                     calloutAnchor={{ x: 0.5, y: -0.2 }}
                                 >
+
                                     {/* Custom Google-style marker with icon */}
-                                    <CustomGoogleMarker primaryType={mapToFilterCategory(place.primaryType) || 'restaurant'} />
+                                    <CustomGoogleMarker
+                                        primaryType={mapToFilterCategory(place.primaryType) || 'restaurant'}
+                                    />
                                     <CustomCallout place={place} />
                                 </Marker>
                             ))}
@@ -1395,7 +1421,7 @@ export default function App() {
                     <View
                         style={{
                             position: 'absolute',
-                            top: 65 + insets.top, // just under BrandingContainer
+                            top: 62.5 + insets.top, // just under BrandingContainer
                             left: 0,
                             right: 0,
                             flexDirection: 'row',
@@ -1440,7 +1466,7 @@ export default function App() {
                                         ]}
                                     >
                                         <MaterialCommunityIcons name="coffee" size={20} color={getIconColor(filters.cafe)} style={{ marginRight: 7 }} />
-                                        <Text style={{ color: getTextColor(filters.cafe), fontWeight: '600', fontSize: 15 }}>Café</Text>
+                                        <Text style={{ color: getTextColor(filters.cafe), fontWeight: '600', fontSize: 14 }}>Café</Text>
                                     </TouchableOpacity>
                                 );
                             })()}
@@ -1474,7 +1500,7 @@ export default function App() {
                                         ]}
                                     >
                                         <MaterialCommunityIcons name="cart" size={20} color={getIconColor(filters.grocery_store)} style={{ marginRight: 7 }} />
-                                        <Text style={{ color: getTextColor(filters.grocery_store), fontWeight: '600', fontSize: 15 }}>Grocery</Text>
+                                        <Text style={{ color: getTextColor(filters.grocery_store), fontWeight: '600', fontSize: 14 }}>Grocery</Text>
                                     </TouchableOpacity>
                                 );
                             })()}
@@ -1508,7 +1534,7 @@ export default function App() {
                                         ]}
                                     >
                                         <MaterialCommunityIcons name="silverware-fork-knife" size={20} color={getIconColor(filters.restaurant)} style={{ marginRight: 7 }} />
-                                        <Text style={{ color: getTextColor(filters.restaurant), fontWeight: '600', fontSize: 15 }}>Restaurant</Text>
+                                        <Text style={{ color: getTextColor(filters.restaurant), fontWeight: '600', fontSize: 14 }}>Restaurant</Text>
                                     </TouchableOpacity>
                                 );
                             })()}
@@ -1542,7 +1568,7 @@ export default function App() {
                                         ]}
                                     >
                                         <FontAwesome5 name="toilet" size={20} color={getIconColor(filters.public_bathroom)} style={{ marginRight: 7 }} />
-                                        <Text style={{ color: getTextColor(filters.public_bathroom), fontWeight: '600', fontSize: 15 }}>Public Bathroom</Text>
+                                        <Text style={{ color: getTextColor(filters.public_bathroom), fontWeight: '600', fontSize: 14 }}>Public Bathroom</Text>
                                     </TouchableOpacity>
                                 );
                             })()}
@@ -1576,7 +1602,7 @@ export default function App() {
                                         ]}
                                     >
                                         <MaterialCommunityIcons name="gas-station" size={20} color={getIconColor(filters.pit_stop)} style={{ marginRight: 7 }} />
-                                        <Text style={{ color: getTextColor(filters.pit_stop), fontWeight: '600', fontSize: 15 }}>Gas Station</Text>
+                                        <Text style={{ color: getTextColor(filters.pit_stop), fontWeight: '600', fontSize: 14 }}>Gas Station</Text>
                                     </TouchableOpacity>
                                 );
                             })()}
@@ -1610,7 +1636,7 @@ export default function App() {
                                         ]}
                                     >
                                         <Entypo name="drink" size={20} color={getIconColor(filters.bar)} style={{ marginRight: 7 }} />
-                                        <Text style={{ color: getTextColor(filters.bar), fontWeight: '600', fontSize: 15 }}>Bar</Text>
+                                        <Text style={{ color: getTextColor(filters.bar), fontWeight: '600', fontSize: 14 }}>Bar</Text>
                                     </TouchableOpacity>
                                 );
                             })()}
@@ -1623,7 +1649,7 @@ export default function App() {
                             key="search-area"
                             style={[
                                 styles.searchThisAreaContainer,
-                                { top: insets.top + 130, position: 'absolute', alignSelf: 'center', zIndex: 0 }
+                                { top: insets.top + 125, position: 'absolute', alignSelf: 'center', zIndex: 0 }
                             ]}
                         >
                             <TouchableOpacity
@@ -1754,6 +1780,8 @@ export default function App() {
                         index={0}
                         snapPoints={snapPoints}
                         enablePanDownToClose={false}
+                        enableContentPanningGesture={!selectedPlace}
+                        enableHandlePanningGesture={!selectedPlace}
                         onClose={closeDetails}
                         animatedIndex={animatedIndex}
                         style={[styles.bottomSheet]}
@@ -1796,7 +1824,7 @@ export default function App() {
                                             numberOfLines={1}
                                             adjustsFontSizeToFit
                                             minimumFontScale={0.7}
-                                            style={[styles.placeName, { flex: 1, fontSize: 29, marginBottom: 4 }]}>
+                                            style={[styles.placeName, { flex: 1, fontSize: 27, marginBottom: 4 }]}>
                                             {selectedPlace.displayName?.text ?? 'Unnamed Place'}
                                         </Text>
                                         <TouchableOpacity onPress={closeDetails} style={[styles.closeIcon, { marginBottom: -2 }]} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
@@ -1806,19 +1834,36 @@ export default function App() {
                                         </TouchableOpacity>
                                     </View>
 
-                                    <Text style={[
-                                        styles.detailOpenStatus,
-                                        {
-                                            color: selectedPlace.currentOpeningHours?.openNow ? '#059669' : '#dc2626',
-                                            marginBottom: 8,
-                                        }
-                                    ]}>
-                                        {selectedPlace.currentOpeningHours?.openNow ? 'Open Now' : 'Closed'}
-                                    </Text>
+                                    {selectedPlace.currentOpeningHours ? (
+                                        <Text style={[
+                                            styles.detailOpenStatus,
+                                            {
+                                                color: selectedPlace.currentOpeningHours.openNow ? '#059669' : '#dc2626',
+                                                marginBottom: 8,
+                                            }
+                                        ]}>
+                                            {selectedPlace.currentOpeningHours.openNow ? 'Open Now' : 'Closed'}
+                                        </Text>
+                                    ) : (
+                                        <Text style={[
+                                            styles.detailOpenStatus,
+                                            {
+                                                color: '#2d3037ff',
+                                                marginVertical: 4,
+                                                marginBottom: 9,
+                                            }
+                                        ]}>
+                                            No hours found
+                                        </Text>
+                                    )}
 
-                                    {selectedPlace.rating != null && (
+                                    {selectedPlace.rating != null ? (
                                         <Text style={[styles.detailRating, { marginBottom: 10 }]}>
                                             ⭐ {selectedPlace.rating.toFixed(1)} ({selectedPlace.userRatingCount ?? 0} reviews)
+                                        </Text>
+                                    ) : (
+                                        <Text style={[styles.detailRating, { marginBottom: 10, color: '#6b7280' }]}>
+                                            ⭐ 0.0 (No reviews)
                                         </Text>
                                     )}
                                     <View style={{ flexDirection: 'row', alignItems: 'center', marginVertical: 1, marginBottom: 10 }}>
@@ -2042,12 +2087,12 @@ const styles = StyleSheet.create({
     openNowText: {
         color: '#1e3a8a',
         fontWeight: '600',
-        fontSize: 12,
+        fontSize: 13,
     },
     openNowTextActive: {
         color: '#fff', // White text when selected
         fontWeight: '700',
-        fontSize: 12,
+        fontSize: 13,
     },
     gpsButtonContainer: {
         position: 'absolute',
@@ -2091,7 +2136,7 @@ const styles = StyleSheet.create({
         paddingVertical: 12,
         borderBottomWidth: 1,
         borderColor: '#ddd',
-        height: 110,
+        height: 120,
     },
 
     placeInfoContainer: {
@@ -2106,7 +2151,7 @@ const styles = StyleSheet.create({
 
     placeName: {
         paddingTop: 5,
-        fontSize: 22,
+        fontSize: 20,
         fontWeight: '700',
         color: '#1e3a8a', // deep blue for consistency
     },
@@ -2309,8 +2354,8 @@ const styles = StyleSheet.create({
     filterPill: {
         flexDirection: 'row',
         alignItems: 'center',
-        paddingHorizontal: 16,
-        paddingVertical: 8,
+        paddingHorizontal: 14,
+        paddingVertical: 7.5,
         borderRadius: 999,
         marginRight: 2,
         marginVertical: 8,
@@ -2361,7 +2406,7 @@ const styles = StyleSheet.create({
     searchThisAreaButton: {
         backgroundColor: '#1e3a8a',
         paddingVertical: 13,
-        paddingHorizontal: 20,
+        paddingHorizontal: 16,
         borderRadius: 25,
         elevation: 5,
         shadowColor: '#000',
@@ -2372,7 +2417,7 @@ const styles = StyleSheet.create({
 
     searchThisAreaText: {
         color: 'white',
-        fontSize: 15,
+        fontSize: 13.5,
         fontWeight: '600',
         textAlign: 'center',
     }
