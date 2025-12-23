@@ -6,14 +6,14 @@ const BrandingContainer: React.FC = () => {
     const insets = useSafeAreaInsets();
 
     return (
-        <View style={[styles.brandingContainer, { top: insets.top + 10 }]}>
+        <View style={[styles.brandingContainer, { top: insets.top + 5 }]}>
             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                 <Text style={styles.brandingText}>PottyPal</Text>
                 <Image
                     source={require('../assets/images/icon-transparent.png')}
                     style={{
-                        width: 30,
-                        height: 30,
+                        width: 28,
+                        height: 28,
                         marginLeft: 1,
                         marginBottom: 2,
                         resizeMode: 'contain',
@@ -30,9 +30,9 @@ const styles = StyleSheet.create({
         alignSelf: 'center',
         justifyContent: 'center',
         alignItems: 'center',
-        backgroundColor: 'rgba(255, 255, 255, 0.75)',
-        paddingVertical: 8,
-        paddingHorizontal: 16,
+        backgroundColor: 'rgba(255, 255, 255, 0.8)',
+        paddingVertical: 7,
+        paddingHorizontal: 14,
         borderRadius: 25,
         flexDirection: 'row',
         gap: 10,
@@ -45,7 +45,7 @@ const styles = StyleSheet.create({
 
     },
     brandingText: {
-        fontSize: 21,
+        fontSize: 19,
         fontWeight: 'bold',
         color: '#1e3a8a',
         fontFamily: 'HelveticaNeue',

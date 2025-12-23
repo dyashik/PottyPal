@@ -10,6 +10,7 @@ import {
     InteractionManager,
     Modal,
     ScrollView,
+    Share,
 } from 'react-native';
 import { interpolate } from 'react-native-reanimated';
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
@@ -17,7 +18,7 @@ import { useRouter } from 'expo-router';
 import * as Location from 'expo-location';
 import { FetchNearbyPlacesResponse, Place } from '@/utils/api';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
-import { Entypo, FontAwesome5, FontAwesome6, MaterialIcons } from '@expo/vector-icons';
+import { Entypo, FontAwesome5, FontAwesome6, MaterialIcons, Octicons } from '@expo/vector-icons';
 import CustomGoogleMarker from '../components/CustomGoogleMarker';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import BottomSheet, { BottomSheetFlatList } from '@gorhom/bottom-sheet';
@@ -31,6 +32,7 @@ import CustomCallout from '@/components/CustomCallout';
 import TravelModeDropdown from '../components/TravelModeDropdown';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import LoadingIndicator from '@/components/LoadingIndicator';
+import { BannerAd, BannerAdSize } from 'react-native-google-mobile-ads';
 
 const { width } = Dimensions.get('window');
 
@@ -54,6 +56,7 @@ export default function App() {
     const lastFetchedRef = useRef<{ center: { latitude: number; longitude: number }; radius: number } | null>(null);
     const initialRegionTimeoutRef = useRef<number | NodeJS.Timeout | null>(null);
     const ignoreRegionChangeRef = useRef(true);
+    const isInitialMountRef = useRef(true);
     const [filters, setFilters] = useState({
         restaurant: true,
         cafe: true,
@@ -269,8 +272,8 @@ export default function App() {
         // Calculate responsive percentages based on screen size
         // iPhone 13 Pro has ~844px height, so 31% ≈ 262px and 12.5% ≈ 106px, 50% ≈ 422px, 55% ≈ 464px
         const collapsedHeight = Math.max(100, availableHeight * 0.05); // minimum 100px
-        const midHeight = Math.max(300, availableHeight * 0.40);         // minimum 300px - 55% for list view (increased from 50%)
-        const selectedHeight = Math.max(280, availableHeight * 0.32);   // minimum 280px - 38% for selected place (increased from 31%)
+        const midHeight = Math.max(300, availableHeight * 0.43);         // minimum 300px - 55% for list view (increased from 50%)
+        const selectedHeight = Math.max(285, availableHeight * 0.34);   // minimum 320px - 38% for selected place (increased to show 50% of ad)
         const expandedHeight = Math.max(400, availableHeight * 0.70);   // minimum 400px
 
         // Convert back to percentages of total screen height
@@ -292,8 +295,42 @@ export default function App() {
         }
     }, [selectedPlace, snapPoints]);
 
+    // Save travel mode preference when it changes
+    useEffect(() => {
+        // Skip saving on initial mount to avoid overwriting saved preference
+        if (isInitialMountRef.current) {
+            console.log('Skipping save on initial mount, travelMode:', travelMode);
+            return;
+        }
+
+        (async () => {
+            try {
+                console.log('Travel mode changed to:', travelMode);
+                await AsyncStorage.setItem('travelMode', travelMode);
+                console.log('Travel mode saved to AsyncStorage:', travelMode);
+            } catch (error) {
+                console.error('Failed to save travel mode preference:', error);
+            }
+        })();
+    }, [travelMode]);
+
     useEffect(() => {
         (async () => {
+            // Load saved travel mode preference
+            try {
+                const savedTravelMode = await AsyncStorage.getItem('travelMode');
+                console.log('Loaded saved travel mode from AsyncStorage:', savedTravelMode);
+                if (savedTravelMode === 'walking' || savedTravelMode === 'driving') {
+                    setTravelMode(savedTravelMode);
+                    console.log('Travel mode set to:', savedTravelMode);
+                }
+                // Mark initial mount as complete after loading preference
+                isInitialMountRef.current = false;
+            } catch (error) {
+                console.error('Failed to load travel mode preference:', error);
+                isInitialMountRef.current = false;
+            }
+
             const { status } = await Location.requestForegroundPermissionsAsync();
             if (status !== 'granted') {
                 router.push('/locationDenied');
@@ -351,7 +388,7 @@ export default function App() {
                         return filters[category] && (!openNowOnly || !place.currentOpeningHours || place.currentOpeningHours.openNow);
                     }).length;
                     console.log('Number of filtered places:', currentFilteredCount);
-                    if (currentFilteredCount > 1) {
+                    if (currentFilteredCount > 2) {
                         console.log('Snapping to index 1 for initial load with multiple places | Snap Point: ' + snapPoints[1]);
                         bottomSheetRef.current?.snapToIndex(1);
                     } else {
@@ -853,8 +890,9 @@ export default function App() {
 
 
     const fetchWalkingTimeAndDistance = async (place: Place) => {
-        const apiKey = getGoogleMapsKey(true);
-        if (!apiKey) throw new Error("Google API key is missing");
+        // Use Mapbox Directions API instead of Google Distance Matrix
+        const MAPBOX_TOKEN = process.env.EXPO_PUBLIC_MAPBOX_TOKEN;
+        if (!MAPBOX_TOKEN) throw new Error("Mapbox token is missing");
 
         const userLocation = await Location.getCurrentPositionAsync({});
         const { latitude: userLat, longitude: userLng } = userLocation.coords;
@@ -862,33 +900,63 @@ export default function App() {
         const destinationLat = place.location.latitude;
         const destinationLng = place.location.longitude;
 
-        const origins = `${userLat},${userLng}`;
-        const destinations = `${destinationLat},${destinationLng}`;
-        const baseUrl = "https://maps.googleapis.com/maps/api/distancematrix/json";
+        // Mapbox uses lng,lat order (opposite of Google)
+        const origin = `${userLng},${userLat}`;
+        const destination = `${destinationLng},${destinationLat}`;
 
         const modes = ["walking", "driving"];
 
         const results: Record<string, { duration: string; distance: string }> = {};
 
         for (const mode of modes) {
-            const url = `${baseUrl}?origins=${origins}&destinations=${destinations}&mode=${mode}&units=imperial&key=${apiKey}`;
+            try {
+                const url = `https://api.mapbox.com/directions/v5/mapbox/${mode}/${origin};${destination}?access_token=${MAPBOX_TOKEN}&geometries=geojson`;
 
-            const response = await fetch(url);
-            const data = await response.json();
+                const response = await fetch(url);
+                const data = await response.json();
 
-            if (
-                data.status === "OK" &&
-                data.rows.length > 0 &&
-                data.rows[0].elements.length > 0 &&
-                data.rows[0].elements[0].status === "OK"
-            ) {
-                const element = data.rows[0].elements[0];
-                results[mode] = {
-                    duration: element.duration.text,
-                    distance: element.distance.text,
-                };
-            } else {
-                console.warn(`Distance Matrix error for mode: ${mode}`, data);
+                if (data.routes && data.routes.length > 0) {
+                    const route = data.routes[0];
+                    const durationSeconds = route.duration;
+                    const distanceMeters = route.distance;
+
+                    // Convert to minutes and miles
+                    const minutes = Math.round(durationSeconds / 60);
+                    const miles = distanceMeters * 0.000621371; // meters to miles
+
+                    // Format duration
+                    let durationText: string;
+                    if (minutes < 1) {
+                        durationText = '< 1 min';
+                    } else if (minutes < 60) {
+                        durationText = `${minutes} min${minutes > 1 ? 's' : ''}`;
+                    } else {
+                        const hours = Math.floor(minutes / 60);
+                        const remainingMins = minutes % 60;
+                        durationText = remainingMins > 0
+                            ? `${hours} hour${hours > 1 ? 's' : ''} ${remainingMins} min${remainingMins > 1 ? 's' : ''}`
+                            : `${hours} hour${hours > 1 ? 's' : ''}`;
+                    }
+
+                    // Format distance
+                    let distanceText: string;
+                    if (miles < 0.1) {
+                        const feet = Math.round(miles * 5280);
+                        distanceText = `${feet} ft`;
+                    } else {
+                        distanceText = `${miles.toFixed(1)} mi`;
+                    }
+
+                    results[mode] = {
+                        duration: durationText,
+                        distance: distanceText,
+                    };
+                } else {
+                    console.warn(`Mapbox Directions error for mode: ${mode}`, data);
+                    results[mode] = { duration: "Unavailable", distance: "Unavailable" };
+                }
+            } catch (error) {
+                console.error(`Error fetching Mapbox directions for ${mode}:`, error);
                 results[mode] = { duration: "Unavailable", distance: "Unavailable" };
             }
         }
@@ -983,7 +1051,7 @@ export default function App() {
                     return filters[category] && (!openNowOnly || !place.currentOpeningHours || place.currentOpeningHours.openNow);
                 }).length;
                 console.log('Refresh - Number of filtered places:', currentFilteredCount);
-                if (currentFilteredCount > 1) {
+                if (currentFilteredCount > 2) {
                     console.log('Snapping to index 1 for refresh with multiple places');
                     bottomSheetRef.current?.snapToIndex(1);
                 } else {
@@ -1421,7 +1489,7 @@ export default function App() {
                     <View
                         style={{
                             position: 'absolute',
-                            top: 62.5 + insets.top, // just under BrandingContainer
+                            top: 53 + insets.top, // just under BrandingContainer
                             left: 0,
                             right: 0,
                             flexDirection: 'row',
@@ -1649,7 +1717,7 @@ export default function App() {
                             key="search-area"
                             style={[
                                 styles.searchThisAreaContainer,
-                                { top: insets.top + 125, position: 'absolute', alignSelf: 'center', zIndex: 0 }
+                                { top: insets.top + 113, position: 'absolute', alignSelf: 'center', zIndex: 0 }
                             ]}
                         >
                             <TouchableOpacity
@@ -1819,19 +1887,41 @@ export default function App() {
 
                             {selectedPlace ? (
                                 <View style={[styles.detailsContainer]}>
-                                    <View style={styles.titleRow}>
-                                        <Text
-                                            numberOfLines={1}
-                                            adjustsFontSizeToFit
-                                            minimumFontScale={0.7}
-                                            style={[styles.placeName, { flex: 1, fontSize: 27, marginBottom: 4 }]}>
-                                            {selectedPlace.displayName?.text ?? 'Unnamed Place'}
-                                        </Text>
-                                        <TouchableOpacity onPress={closeDetails} style={[styles.closeIcon, { marginBottom: -2 }]} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-                                            <View style={styles.closeIconCircle}>
-                                                <MaterialCommunityIcons name="close" size={20} color="#333" />
-                                            </View>
-                                        </TouchableOpacity>
+                                    <View style={{ position: 'relative' }}>
+                                        <View style={styles.titleRow}>
+                                            <Text
+                                                numberOfLines={1}
+                                                ellipsizeMode="tail"
+                                                adjustsFontSizeToFit
+                                                minimumFontScale={0.7}
+                                                style={[styles.placeName, { flex: 1, fontSize: 27, marginBottom: 4, paddingRight: 90 }]}>
+                                                {selectedPlace.displayName?.text ?? 'Unnamed Place'}
+                                            </Text>
+                                        </View>
+
+                                        <View style={{ position: 'absolute', top: 12, right: 0, flexDirection: 'row', gap: 10 }}>
+                                            <TouchableOpacity
+                                                onPress={async () => {
+                                                    try {
+                                                        await Share.share({
+                                                            message: selectedPlace.googleMapsLinks?.placeUri ?? 'https://maps.google.com',
+                                                        });
+                                                    } catch (error) {
+                                                        console.error('Share failed:', error);
+                                                    }
+                                                }}
+                                                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                                            >
+                                                <View style={styles.closeIconCircle}>
+                                                    <Octicons name="share" size={17} color="#333" />
+                                                </View>
+                                            </TouchableOpacity>
+                                            <TouchableOpacity onPress={closeDetails} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                                                <View style={styles.closeIconCircle}>
+                                                    <MaterialCommunityIcons name="close" size={20} color="#333" />
+                                                </View>
+                                            </TouchableOpacity>
+                                        </View>
                                     </View>
 
                                     {selectedPlace.currentOpeningHours ? (
@@ -1907,6 +1997,17 @@ export default function App() {
                                                     : 'Distance unavailable'}
                                             </Text>
                                         </TouchableOpacity>
+                                    </View>
+
+                                    {/* Banner Ad */}
+                                    <View style={{ marginTop: 13, width: '100%', alignItems: 'center' }}>
+                                        <BannerAd
+                                            unitId="ca-app-pub-3844546379677181/4302897388"
+                                            size={BannerAdSize.ANCHORED_ADAPTIVE_BANNER}
+                                            requestOptions={{
+                                                requestNonPersonalizedAdsOnly: false,
+                                            }}
+                                        />
                                     </View>
                                 </View>
                             ) : (
@@ -2299,8 +2400,8 @@ const styles = StyleSheet.create({
     closeIconCircle: {
         backgroundColor: '#e0e0e0', // light gray circle
         borderRadius: 20,
-        width: 32,
-        height: 32,
+        width: 35,
+        height: 35,
         alignItems: 'center',
         justifyContent: 'center',
     },

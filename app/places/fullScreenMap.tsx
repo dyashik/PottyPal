@@ -268,7 +268,7 @@ export default function FullscreenMap() {
             </View>
 
             {/* GPS Button */}
-            <View style={{ top: 8, zIndex: 999 }}>
+            <View style={{ top: 10, zIndex: 999 }}>
                 <BrandingContainer />
             </View>
 
